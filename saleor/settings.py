@@ -227,6 +227,7 @@ INSTALLED_APPS = [
     # Local apps
     "saleor.account",
     "saleor.discount",
+    "saleor.giftcard",
     "saleor.product",
     "saleor.checkout",
     "saleor.core",
