@@ -24,6 +24,7 @@ from saleor.core.utils.taxes import DEFAULT_TAX_RATE_NAME
 from saleor.dashboard.menu.utils import update_menu
 from saleor.discount import VoucherType
 from saleor.discount.models import Sale, Voucher, VoucherTranslation
+from saleor.giftcard.models import GiftCard
 from saleor.menu.models import Menu, MenuItem
 from saleor.order import OrderStatus
 from saleor.order.events import OrderEvents
@@ -345,6 +346,11 @@ def permission_manage_discounts():
 
 
 @pytest.fixture
+def permission_manage_giftcard():
+    return Permission.objects.get(codename='manage_gift_card')
+
+
+@pytest.fixture
 def permission_manage_orders():
     return Permission.objects.get(codename="manage_orders")
 
@@ -592,6 +598,13 @@ def voucher_shipping_type():
     return Voucher.objects.create(
         code="mirumee", discount_value=10, type=VoucherType.SHIPPING, countries="IS"
     )
+
+
+@pytest.fixture
+def gift_card(customer_user):  # pylint: disable=W0613
+    return GiftCard.objects.create(
+        code='mirumee', creator=customer_user, initial_balance=10,
+        current_balance=10)
 
 
 @pytest.fixture()
