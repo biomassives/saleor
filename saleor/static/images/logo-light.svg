@@ -1,17 +1,43 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
 <svg
    xmlns:dc="http://purl.org/dc/elements/1.1/"
    xmlns:cc="http://creativecommons.org/ns#"
    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
    xmlns:svg="http://www.w3.org/2000/svg"
    xmlns="http://www.w3.org/2000/svg"
-   id="svg8"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="166"
+   height="49"
+   viewBox="0 0 43.920861 12.964587"
    version="1.1"
-   viewBox="0 0 79.374998 15.875"
-   height="60"
-   width="300">
+   id="svg8"
+   inkscape:version="0.92.3 (2405546, 2018-03-11)"
+   sodipodi:docname="dukama0.svg">
   <defs
      id="defs2" />
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="1.979899"
+     inkscape:cx="163.50936"
+     inkscape:cy="100.58197"
+     inkscape:document-units="mm"
+     inkscape:current-layer="layer1"
+     showgrid="false"
+     inkscape:snap-text-baseline="false"
+     units="px"
+     inkscape:window-width="1366"
+     inkscape:window-height="680"
+     inkscape:window-x="0"
+     inkscape:window-y="27"
+     inkscape:window-maximized="1" />
   <metadata
      id="metadata5">
     <rdf:RDF>
@@ -25,24 +51,39 @@
     </rdf:RDF>
   </metadata>
   <g
-     transform="translate(0,-281.12498)"
-     id="layer1">
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(0,-284.03536)">
     <text
-       transform="scale(0.89111159,1.1221939)"
-       id="text12"
-       y="260.61832"
-       x="3.5425694"
+       xml:space="preserve"
        style="font-style:normal;font-weight:normal;font-size:9.43093109px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.23577327"
-       xml:space="preserve"><tspan
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:9.43093109px;font-family:Dyuthi;-inkscape-font-specification:'Dyuthi, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.23577327"
-         y="260.61832"
-         x="3.5425694"
-         id="tspan10"><tspan
-           id="tspan14"
-           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:9.43093109px;font-family:Dyuthi;-inkscape-font-specification:'Dyuthi, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;fill:#800000;stroke-width:0.23577327">duka</tspan><tspan
-           id="tspan16"
-           style="fill:#aa8800;stroke-width:0.23577327">MAMA</tspan><tspan
-           id="tspan20"
-           style="fill:#008000;stroke-width:0.23577327">WATOTO</tspan></tspan></text>
+       x="2.3428566"
+       y="259.30841"
+       id="text12"
+       transform="scale(0.89111159,1.1221939)"><tspan
+         sodipodi:role="line"
+         id="tspan10"
+         x="2.3428566"
+         y="259.30841"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:9.43093109px;font-family:Dyuthi;-inkscape-font-specification:'Dyuthi, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.23577327"><tspan
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:9.43093109px;font-family:Dyuthi;-inkscape-font-specification:'Dyuthi, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;fill:#800000;stroke-width:0.23577327"
+           id="tspan14">duka</tspan><tspan
+           style="fill:#aa8800;stroke-width:0.23577327"
+           id="tspan16">MAMA</tspan><tspan
+           style="fill:#008000;stroke-width:0.23577327"
+           id="tspan20" /></tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:8.18276501px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.20456912"
+       x="2.1494529"
+       y="366.0856"
+       id="text62"
+       transform="scale(1.2357142,0.80924862)"><tspan
+         sodipodi:role="line"
+         id="tspan60"
+         x="2.1494529"
+         y="366.0856"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:8.18276501px;font-family:Ani;-inkscape-font-specification:'Ani, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;fill:#008000;stroke-width:0.20456912">WATOTO</tspan></text>
   </g>
 </svg>
