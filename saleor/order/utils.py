@@ -3,18 +3,19 @@ from functools import wraps
 from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect
+from django.utils import timezone
 from prices import Money, TaxedMoney
 
 from ..account.utils import store_user_address
 from ..checkout import AddressType
-from ..core.utils.taxes import ZERO_MONEY, get_tax_rate_by_name, get_taxes_for_address
+from ..core.taxes import zero_money
+from ..core.taxes.interface import calculate_order_line_unit, calculate_order_shipping
 from ..core.weight import zero_weight
 from ..dashboard.order.utils import get_voucher_discount_for_order
 from ..discount.models import NotApplicable
 from ..order import FulfillmentStatus, OrderStatus, emails
 from ..order.models import Fulfillment, FulfillmentLine, Order, OrderLine
 from ..payment import ChargeStatus
-from ..payment.utils import gateway_refund, gateway_void
 from ..product.utils import (
     allocate_stock,
     deallocate_stock,
@@ -22,6 +23,7 @@ from ..product.utils import (
     increase_stock,
 )
 from ..product.utils.digital_products import get_default_digital_content_settings
+from ..shipping.models import ShippingMethod
 from . import events
 
 
@@ -110,7 +112,7 @@ def update_voucher_discount(func):
             try:
                 discount_amount = get_voucher_discount_for_order(order)
             except NotApplicable:
-                discount_amount = ZERO_MONEY
+                discount_amount = zero_money()
             order.discount_amount = discount_amount
         return func(*args, **kwargs)
 
@@ -152,16 +154,22 @@ def recalculate_order_weight(order):
 
 def update_order_prices(order, discounts):
     """Update prices in order with given discounts and proper taxes."""
-    taxes = get_taxes_for_address(order.shipping_address)
-
     for line in order:
         if line.variant:
-            line.unit_price = line.variant.get_price(discounts, taxes)
-            line.tax_rate = get_tax_rate_by_name(line.variant.product.tax_rate, taxes)
-            line.save()
+            unit_price = line.variant.get_price(discounts)
+            line.unit_price_net = unit_price
+            line.unit_price_gross = unit_price
+            line.save(update_fields=["unit_price_net", "unit_price_gross"])
+
+            price = calculate_order_line_unit(line)
+            if price != line.unit_price:
+                line.unit_price = price
+                if price.tax and price.net:
+                    line.tax_rate = price.tax / price.net
+                line.save()
 
     if order.shipping_method:
-        order.shipping_price = order.shipping_method.get_total(taxes)
+        order.shipping_price = calculate_order_shipping(order)
         order.save()
 
     recalculate_order(order)
@@ -189,6 +197,8 @@ def cancel_order(user, order, restock):
     payments = order.payments.filter(is_active=True).exclude(
         charge_status=ChargeStatus.FULLY_REFUNDED
     )
+
+    from ..payment.utils import gateway_refund, gateway_void
 
     for payment in payments:
         if payment.can_refund():
@@ -251,7 +261,6 @@ def add_variant_to_order(
     variant,
     quantity,
     discounts=None,
-    taxes=None,
     allow_overselling=False,
     track_inventory=True,
 ):
@@ -270,6 +279,7 @@ def add_variant_to_order(
         line.quantity += quantity
         line.save(update_fields=["quantity"])
     except OrderLine.DoesNotExist:
+        unit_price = variant.get_price(discounts)
         product_name = variant.display_product()
         translated_product_name = variant.display_product(translated=True)
         if translated_product_name == product_name:
@@ -280,14 +290,38 @@ def add_variant_to_order(
             product_sku=variant.sku,
             is_shipping_required=variant.is_shipping_required(),
             quantity=quantity,
+            unit_price_net=unit_price,
+            unit_price_gross=unit_price,
             variant=variant,
-            unit_price=variant.get_price(discounts, taxes),
-            tax_rate=get_tax_rate_by_name(variant.product.tax_rate, taxes),
         )
+
+        unit_price = calculate_order_line_unit(line)
+        line.unit_price_net = unit_price.net
+        line.unit_price_gross = unit_price.gross
+        line.tax_rate = unit_price.tax / unit_price.net
+        line.save(update_fields=["unit_price_net", "unit_price_gross", "tax_rate"])
 
     if variant.track_inventory and track_inventory:
         allocate_stock(variant, quantity)
     return line
+
+
+def add_gift_card_to_order(order, gift_card, total_price_left):
+    """Add gift card to order.
+
+    Return a total price left after applying the gift cards.
+    """
+    if total_price_left > zero_money(total_price_left.currency):
+        order.gift_cards.add(gift_card)
+        if total_price_left < gift_card.current_balance:
+            gift_card.current_balance = gift_card.current_balance - total_price_left
+            total_price_left = zero_money(total_price_left.currency)
+        else:
+            total_price_left = total_price_left - gift_card.current_balance
+            gift_card.current_balance = 0
+        gift_card.last_used_on = timezone.now()
+        gift_card.save(update_fields=["current_balance", "last_used_on"])
+    return total_price_left
 
 
 def change_order_line_quantity(user, line, old_quantity, new_quantity):
@@ -341,3 +375,9 @@ def sum_order_totals(qs):
     zero = Money(0, currency=settings.DEFAULT_CURRENCY)
     taxed_zero = TaxedMoney(zero, zero)
     return sum([order.total for order in qs], taxed_zero)
+
+
+def get_valid_shipping_methods_for_order(order: Order):
+    return ShippingMethod.objects.applicable_shipping_methods_for_instance(
+        order, price=order.get_subtotal().gross
+    )

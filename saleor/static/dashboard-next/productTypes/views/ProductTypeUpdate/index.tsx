@@ -1,10 +1,10 @@
 import DialogContentText from "@material-ui/core/DialogContentText";
-import * as React from "react";
+import React from "react";
 
-import ActionDialog from "../../../components/ActionDialog";
-import { WindowTitle } from "../../../components/WindowTitle";
-import useNavigator from "../../../hooks/useNavigator";
-import useNotifier from "../../../hooks/useNotifier";
+import ActionDialog from "@saleor/components/ActionDialog";
+import { WindowTitle } from "@saleor/components/WindowTitle";
+import useNavigator from "@saleor/hooks/useNavigator";
+import useNotifier from "@saleor/hooks/useNotifier";
 import i18n from "../../../i18n";
 import { getMutationState, maybe } from "../../../misc";
 import { AttributeTypeEnum } from "../../../types/globalTypes";
@@ -153,7 +153,7 @@ export const ProductTypeUpdate: React.StatelessComponent<
                         productAttributes: formData.productAttributes.map(
                           choice => choice.value
                         ),
-                        taxRate: formData.taxRate,
+                        taxCode: formData.taxType.value,
                         variantAttributes: formData.variantAttributes.map(
                           choice => choice.value
                         ),
@@ -223,6 +223,14 @@ export const ProductTypeUpdate: React.StatelessComponent<
                     )
                   );
 
+                  const formTransitionState = getMutationState(
+                    updateProductType.opts.called,
+                    updateProductType.opts.loading,
+                    maybe(
+                      () => updateProductType.opts.data.productTypeUpdate.errors
+                    )
+                  );
+
                   const attribute = maybe(() =>
                     data.productType.productAttributes
                       .concat(data.productType.variantAttributes)
@@ -240,7 +248,8 @@ export const ProductTypeUpdate: React.StatelessComponent<
                         errors={errors.formErrors}
                         pageTitle={maybe(() => data.productType.name)}
                         productType={maybe(() => data.productType)}
-                        saveButtonBarState={loading ? "loading" : "default"}
+                        saveButtonBarState={formTransitionState}
+                        taxTypes={maybe(() => data.taxTypes, [])}
                         onAttributeAdd={type =>
                           navigate(
                             productTypeUrl(id, {

@@ -20,7 +20,6 @@ from geolite2 import geolite2
 from prices import MoneyRange
 from versatileimagefield.image_warmer import VersatileImageFieldWarmer
 
-from ...account.models import User
 from ...account.utils import get_random_avatar
 from ...celeryconf import app
 from ...core.i18n import COUNTRY_CODE_CHOICES
@@ -136,6 +135,8 @@ def serialize_decimal(obj):
 
 
 def create_superuser(credentials):
+    from ...account.models import User
+
     user, created = User.objects.get_or_create(
         email=credentials["email"],
         defaults={"is_active": True, "is_staff": True, "is_superuser": True},
@@ -178,3 +179,7 @@ def get_country_name_by_code(country_code):
         country_code,
     )
     return country_name
+
+
+def get_company_address():
+    return Site.objects.get_current().settings.company_address

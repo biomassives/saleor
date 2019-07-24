@@ -13,6 +13,7 @@ from django.shortcuts import reverse
 from freezegun import freeze_time
 from prices import Money
 
+from saleor.account import events as account_events
 from saleor.account.models import Address, User
 from saleor.checkout import AddressType
 from saleor.graphql.account.mutations import (
@@ -535,7 +536,7 @@ def test_customer_register(user_api_client):
     content = get_graphql_content(response)
     data = content["data"]["customerRegister"]
     assert not data["errors"]
-    assert User.objects.filter(email=email).exists()
+    new_user = User.objects.get(email=email)
 
     response = user_api_client.post_graphql(query, variables)
     content = get_graphql_content(response)
@@ -543,6 +544,10 @@ def test_customer_register(user_api_client):
     assert data["errors"]
     assert data["errors"][0]["field"] == "email"
     assert data["errors"][0]["message"] == ("User with this Email already exists.")
+
+    customer_creation_event = account_events.CustomerEvent.objects.get()
+    assert customer_creation_event.type == account_events.CustomerEvents.ACCOUNT_CREATED
+    assert customer_creation_event.user == new_user
 
 
 @patch("saleor.dashboard.emails.send_set_password_customer_email.delay")
@@ -610,11 +615,11 @@ def test_customer_create(
     content = get_graphql_content(response)
 
     User = get_user_model()
-    customer = User.objects.get(email=email)
+    new_customer = User.objects.get(email=email)
 
     shipping_address, billing_address = (
-        customer.default_shipping_address,
-        customer.default_billing_address,
+        new_customer.default_shipping_address,
+        new_customer.default_billing_address,
     )
     assert shipping_address == address
     assert billing_address == address
@@ -632,11 +637,15 @@ def test_customer_create(
     assert send_set_password_customer_email_mock.call_count == 1
     args, kwargs = send_set_password_customer_email_mock.call_args
     call_pk = args[0]
-    assert call_pk == customer.pk
+    assert call_pk == new_customer.pk
+
+    customer_creation_event = account_events.CustomerEvent.objects.get()
+    assert customer_creation_event.type == account_events.CustomerEvents.ACCOUNT_CREATED
+    assert customer_creation_event.user == new_customer
 
 
 def test_customer_update(
-    staff_api_client, customer_user, address, permission_manage_users
+    staff_api_client, staff_user, customer_user, address, permission_manage_users
 ):
     query = """
     mutation UpdateCustomer(
@@ -679,7 +688,7 @@ def test_customer_update(
     billing_address_pk = customer_user.default_billing_address.pk
     shipping_address_pk = customer_user.default_shipping_address.pk
 
-    id = graphene.Node.to_global_id("User", customer_user.id)
+    user_id = graphene.Node.to_global_id("User", customer_user.id)
     first_name = "new_first_name"
     last_name = "new_last_name"
     note = "Test update note"
@@ -689,7 +698,7 @@ def test_customer_update(
     address_data["streetAddress1"] = new_street_address
 
     variables = {
-        "id": id,
+        "id": user_id,
         "firstName": first_name,
         "lastName": last_name,
         "isActive": False,
@@ -723,6 +732,142 @@ def test_customer_update(
     assert data["user"]["note"] == note
     assert not data["user"]["isActive"]
 
+    # The name was changed, an event should have been triggered
+    name_changed_event = account_events.CustomerEvent.objects.get()
+    assert name_changed_event.type == account_events.CustomerEvents.NAME_ASSIGNED
+    assert name_changed_event.user.pk == staff_user.pk
+    assert name_changed_event.parameters == {"message": customer.get_full_name()}
+
+
+def test_customer_update_generates_event_when_changing_email(
+    staff_api_client, staff_user, customer_user, address, permission_manage_users
+):
+    query = """
+    mutation UpdateCustomer(
+            $id: ID!, $firstName: String, $lastName: String, $email: String) {
+        customerUpdate(id: $id, input: {
+            firstName: $firstName,
+            lastName: $lastName,
+            email: $email
+        }) {
+            errors {
+                field
+                message
+            }
+        }
+    }
+    """
+
+    user_id = graphene.Node.to_global_id("User", customer_user.id)
+    address_data = convert_dict_keys_to_camel_case(address.as_data())
+
+    new_street_address = "Updated street address"
+    address_data["streetAddress1"] = new_street_address
+
+    variables = {
+        "id": user_id,
+        "firstName": customer_user.first_name,
+        "lastName": customer_user.last_name,
+        "email": "mirumee@example.com",
+    }
+    staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_users]
+    )
+
+    # The email was changed, an event should have been triggered
+    email_changed_event = account_events.CustomerEvent.objects.get()
+    assert email_changed_event.type == account_events.CustomerEvents.EMAIL_ASSIGNED
+    assert email_changed_event.user.pk == staff_user.pk
+    assert email_changed_event.parameters == {"message": "mirumee@example.com"}
+
+
+def test_customer_update_without_any_changes_generates_no_event(
+    staff_api_client, customer_user, address, permission_manage_users
+):
+    query = """
+    mutation UpdateCustomer(
+            $id: ID!, $firstName: String, $lastName: String, $email: String) {
+        customerUpdate(id: $id, input: {
+            firstName: $firstName,
+            lastName: $lastName,
+            email: $email
+        }) {
+            errors {
+                field
+                message
+            }
+        }
+    }
+    """
+
+    user_id = graphene.Node.to_global_id("User", customer_user.id)
+    address_data = convert_dict_keys_to_camel_case(address.as_data())
+
+    new_street_address = "Updated street address"
+    address_data["streetAddress1"] = new_street_address
+
+    variables = {
+        "id": user_id,
+        "firstName": customer_user.first_name,
+        "lastName": customer_user.last_name,
+        "email": customer_user.email,
+    }
+    staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_users]
+    )
+
+    # No event should have been generated
+    assert not account_events.CustomerEvent.objects.exists()
+
+
+ACCOUNT_UPDATE_QUERY = """
+    mutation accountUpdate(
+            $billing: AddressInput, $shipping: AddressInput, $firstName: String,
+            $lastName: String) {
+        accountUpdate(
+          input: {
+            defaultBillingAddress: $billing,
+            defaultShippingAddress: $shipping,
+            firstName: $firstName,
+            lastName: $lastName,
+        }) {
+            errors {
+                field
+                message
+            }
+            user {
+                firstName
+                lastName
+                email
+                defaultBillingAddress {
+                    id
+                }
+                defaultShippingAddress {
+                    id
+                }
+            }
+        }
+    }
+"""
+
+
+def test_logged_customer_update_names(user_api_client):
+    first_name = "first"
+    last_name = "last"
+    user = user_api_client.user
+    assert user.first_name != first_name
+    assert user.last_name != last_name
+
+    variables = {"firstName": first_name, "lastName": last_name}
+    response = user_api_client.post_graphql(ACCOUNT_UPDATE_QUERY, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["accountUpdate"]
+
+    user.refresh_from_db()
+    assert not data["errors"]
+    assert user.first_name == first_name
+    assert user.last_name == last_name
+
 
 UPDATE_LOGGED_CUSTOMER_QUERY = """
     mutation UpdateLoggedCustomer($billing: AddressInput,
@@ -750,7 +895,16 @@ UPDATE_LOGGED_CUSTOMER_QUERY = """
 """
 
 
-def test_logged_customer_update(user_api_client, graphql_address_data):
+@pytest.mark.parametrize(
+    "query, mutation_name",
+    [
+        (UPDATE_LOGGED_CUSTOMER_QUERY, "loggedUserUpdate"),
+        (ACCOUNT_UPDATE_QUERY, "accountUpdate"),
+    ],
+)
+def test_logged_customer_update_addresses(
+    user_api_client, graphql_address_data, query, mutation_name
+):
     # this test requires addresses to be set and checks whether new address
     # instances weren't created, but the existing ones got updated
     user = user_api_client.user
@@ -760,9 +914,9 @@ def test_logged_customer_update(user_api_client, graphql_address_data):
     assert user.default_billing_address.first_name != new_first_name
     assert user.default_shipping_address.first_name != new_first_name
     variables = {"billing": graphql_address_data, "shipping": graphql_address_data}
-    response = user_api_client.post_graphql(UPDATE_LOGGED_CUSTOMER_QUERY, variables)
+    response = user_api_client.post_graphql(query, variables)
     content = get_graphql_content(response)
-    data = content["data"]["loggedUserUpdate"]
+    data = content["data"][mutation_name]
     assert not data["errors"]
 
     # check that existing instances are updated
@@ -776,12 +930,64 @@ def test_logged_customer_update(user_api_client, graphql_address_data):
     assert user.default_shipping_address.first_name == new_first_name
 
 
-def test_logged_customer_update_anonymus_user(api_client):
-    response = api_client.post_graphql(UPDATE_LOGGED_CUSTOMER_QUERY, {})
+@pytest.mark.parametrize(
+    "query", [(UPDATE_LOGGED_CUSTOMER_QUERY), (ACCOUNT_UPDATE_QUERY)]
+)
+def test_logged_customer_update_anonymous_user(api_client, query):
+    response = api_client.post_graphql(query, {})
     assert_no_permission(response)
 
 
-def test_customer_delete(staff_api_client, customer_user, permission_manage_users):
+ACCOUNT_REQUEST_DELETION_QUERY = """
+    mutation accountRequestDeletion {
+        accountRequestDeletion {
+            errors {
+                field
+                message
+            }
+        }
+    }
+"""
+
+
+@patch("saleor.account.emails.send_account_delete_confirmation_email.delay")
+def test_account_request_deletion(
+    send_account_delete_confirmation_email_mock, user_api_client
+):
+    user = user_api_client.user
+
+    response = user_api_client.post_graphql(ACCOUNT_REQUEST_DELETION_QUERY)
+    content = get_graphql_content(response)
+    data = content["data"]["accountRequestDeletion"]
+
+    assert not data["errors"]
+    send_account_delete_confirmation_email_mock.assert_called_once_with(
+        str(user.token), user.email
+    )
+
+
+@patch("saleor.account.emails.send_account_delete_confirmation_email.delay")
+def test_account_request_deletion_anonymous_user(
+    send_account_delete_confirmation_email_mock, api_client
+):
+    response = api_client.post_graphql(ACCOUNT_REQUEST_DELETION_QUERY, {})
+    assert_no_permission(response)
+    send_account_delete_confirmation_email_mock.assert_not_called()
+
+
+@patch(
+    "saleor.graphql.account.utils.account_events.staff_user_deleted_a_customer_event"
+)
+def test_customer_delete(
+    mocked_deletion_event,
+    staff_api_client,
+    staff_user,
+    customer_user,
+    permission_manage_users,
+):
+    """Ensure deleting a customer actually deletes the customer and creates proper
+    related events"""
+
     query = """
     mutation CustomerDelete($id: ID!) {
         customerDelete(id: $id){
@@ -805,6 +1011,12 @@ def test_customer_delete(staff_api_client, customer_user, permission_manage_user
     assert data["errors"] == []
     assert data["user"]["id"] == customer_id
 
+    # Ensure the customer was properly deleted
+    # and any related event was properly triggered
+    mocked_deletion_event.assert_called_once_with(
+        staff_user=staff_user, deleted_count=1
+    )
+
 
 def test_customer_delete_errors(customer_user, admin_user, staff_user):
     info = Mock(context=Mock(user=admin_user))
@@ -814,7 +1026,7 @@ def test_customer_delete_errors(customer_user, admin_user, staff_user):
     msg = "Cannot delete a staff account."
     assert e.value.error_dict["id"][0].message == msg
 
-    # shuold not raise any errors
+    # should not raise any errors
     CustomerDelete.clean_instance(info, customer_user)
 
 
@@ -969,7 +1181,7 @@ def test_staff_delete_errors(staff_user, customer_user, admin_user):
     msg = "Cannot delete a non-staff user."
     assert e.value.error_dict["id"][0].message == msg
 
-    # shuold not raise any errors
+    # should not raise any errors
     info = Mock(context=Mock(user=admin_user))
     StaffDelete.clean_instance(info, staff_user)
 
@@ -987,7 +1199,7 @@ def test_staff_update_errors(staff_user, customer_user, admin_user):
     msg = "Cannot deactivate superuser's account."
     assert e.value.error_dict["is_active"][0].message == msg
 
-    # shuold not raise any errors
+    # should not raise any errors
     StaffUpdate.clean_is_active(False, customer_user, staff_user)
 
 
@@ -1025,6 +1237,10 @@ def test_set_password(user_api_client, customer_user):
     customer_user.refresh_from_db()
     assert customer_user.check_password(password)
 
+    password_resent_event = account_events.CustomerEvent.objects.get()
+    assert password_resent_event.type == account_events.CustomerEvents.PASSWORD_RESET
+    assert password_resent_event.user == customer_user
+
 
 @patch("saleor.account.emails.send_password_reset_email.delay")
 def test_password_reset_email(
@@ -1052,8 +1268,10 @@ def test_password_reset_email(
     args, kwargs = send_password_reset_mock.call_args
     call_context = args[0]
     call_email = args[1]
+    call_user_pk = args[2]
     assert call_email == email
     assert "token" in call_context
+    assert call_user_pk == customer_user.pk
 
 
 @patch("saleor.account.emails.send_password_reset_email.delay")
@@ -1303,8 +1521,12 @@ def test_set_default_address(
 
 def test_address_validator(user_api_client):
     query = """
-    query getValidator($input: AddressValidationInput!) {
-        addressValidator(input: $input) {
+    query getValidator(
+        $country_code: CountryCode, $country_area: String, $city_area: String) {
+        addressValidationRules(
+                countryCode: $country_code,
+                countryArea: $country_area,
+                cityArea: $city_area) {
             countryCode
             countryName
             addressFormat
@@ -1313,10 +1535,10 @@ def test_address_validator(user_api_client):
         }
     }
     """
-    variables = {"input": {"countryCode": "PL", "countryArea": None, "cityArea": None}}
+    variables = {"country_code": "PL", "country_area": None, "city_area": None}
     response = user_api_client.post_graphql(query, variables)
     content = get_graphql_content(response)
-    data = content["data"]["addressValidator"]
+    data = content["data"]["addressValidationRules"]
     assert data["countryCode"] == "PL"
     assert data["countryName"] == "POLAND"
     assert data["addressFormat"] is not None
@@ -1330,14 +1552,18 @@ def test_address_validator_uses_geip_when_country_code_missing(
     user_api_client, monkeypatch
 ):
     query = """
-    query getValidator($input: AddressValidationInput!) {
-        addressValidator(input: $input) {
+    query getValidator(
+        $country_code: CountryCode, $country_area: String, $city_area: String) {
+        addressValidationRules(
+                countryCode: $country_code,
+                countryArea: $country_area,
+                cityArea: $city_area) {
             countryCode,
             countryName
         }
     }
     """
-    variables = {"input": {"countryCode": None, "countryArea": None, "cityArea": None}}
+    variables = {"country_code": None, "country_area": None, "city_area": None}
     mock_country_by_ip = Mock(return_value=Mock(code="US"))
     monkeypatch.setattr(
         "saleor.graphql.account.resolvers.get_client_ip",
@@ -1349,15 +1575,19 @@ def test_address_validator_uses_geip_when_country_code_missing(
     response = user_api_client.post_graphql(query, variables)
     content = get_graphql_content(response)
     assert mock_country_by_ip.called
-    data = content["data"]["addressValidator"]
+    data = content["data"]["addressValidationRules"]
     assert data["countryCode"] == "US"
     assert data["countryName"] == "UNITED STATES"
 
 
 def test_address_validator_with_country_area(user_api_client):
     query = """
-    query getValidator($input: AddressValidationInput!) {
-        addressValidator(input: $input) {
+    query getValidator(
+        $country_code: CountryCode, $country_area: String, $city_area: String) {
+        addressValidationRules(
+                countryCode: $country_code,
+                countryArea: $country_area,
+                cityArea: $city_area) {
             countryCode
             countryName
             countryAreaType
@@ -1379,11 +1609,13 @@ def test_address_validator_with_country_area(user_api_client):
     }
     """
     variables = {
-        "input": {"countryCode": "CN", "countryArea": "Fujian Sheng", "cityArea": None}
+        "country_code": "CN",
+        "country_area": "Fujian Sheng",
+        "city_area": None,
     }
     response = user_api_client.post_graphql(query, variables)
     content = get_graphql_content(response)
-    data = content["data"]["addressValidator"]
+    data = content["data"]["addressValidationRules"]
     assert data["countryCode"] == "CN"
     assert data["countryName"] == "CHINA"
     assert data["countryAreaType"] == "province"

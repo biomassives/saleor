@@ -16,10 +16,11 @@ from measurement.measures import Weight
 from prices import Money
 
 from ..account.models import Address
+from ..core.taxes import zero_money, zero_taxed_money
 from ..core.utils.json_serializer import CustomJsonEncoder
-from ..core.utils.taxes import ZERO_TAXED_MONEY, zero_money
 from ..core.weight import WeightUnits, zero_weight
 from ..discount.models import Voucher
+from ..giftcard.models import GiftCard
 from ..payment import ChargeStatus, TransactionKind
 from ..shipping.models import ShippingMethod
 from . import FulfillmentStatus, OrderEvents, OrderStatus
@@ -126,6 +127,7 @@ class Order(models.Model):
     voucher = models.ForeignKey(
         Voucher, blank=True, null=True, related_name="+", on_delete=models.SET_NULL
     )
+    gift_cards = models.ManyToManyField(GiftCard, blank=True, related_name="orders")
     discount_amount = MoneyField(
         currency=settings.DEFAULT_CURRENCY,
         max_digits=settings.DEFAULT_MAX_DIGITS,
@@ -163,7 +165,7 @@ class Order(models.Model):
         total_paid = self._total_paid()
         return total_paid.gross.amount > 0
 
-    def get_user_current_email(self):
+    def get_customer_email(self):
         return self.user.email if self.user else self.user_email
 
     def _total_paid(self):
@@ -177,7 +179,7 @@ class Order(models.Model):
             ]
         )
         total_captured = [payment.get_captured_amount() for payment in payments]
-        total_paid = sum(total_captured, ZERO_TAXED_MONEY)
+        total_paid = sum(total_captured, zero_taxed_money())
         return total_paid
 
     def _index_billing_phone(self):
@@ -231,7 +233,7 @@ class Order(models.Model):
 
     def get_subtotal(self):
         subtotal_iterator = (line.get_total() for line in self)
-        return sum(subtotal_iterator, ZERO_TAXED_MONEY)
+        return sum(subtotal_iterator, zero_taxed_money())
 
     def get_total_quantity(self):
         return sum([line.quantity for line in self])
@@ -458,4 +460,4 @@ class OrderEvent(models.Model):
         ordering = ("date",)
 
     def __repr__(self):
-        return "OrderEvent(type=%r, user=%r)" % (self.type, self.user)
+        return f"{self.__class__.__name__}(type={self.type!r}, user={self.user!r})"

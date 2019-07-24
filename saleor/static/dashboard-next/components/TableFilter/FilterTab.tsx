@@ -6,21 +6,22 @@ import {
 } from "@material-ui/core/styles";
 import Tab from "@material-ui/core/Tab";
 import classNames from "classnames";
-import * as React from "react";
+import React from "react";
 
 const styles = (theme: Theme) =>
   createStyles({
     selectedTabLabel: {
       "&$tabLabel": {
-        color: theme.typography.body1.color
+        color: theme.typography.body2.color
       }
     },
     tabLabel: {
       "&:hover": {
-        color: theme.typography.body1.color
+        color: theme.typography.body2.color
       },
       color: theme.typography.caption.color,
-      fontSize: "0.875rem"
+      fontSize: "1rem",
+      fontWeight: 400
     },
     tabRoot: {
       minWidth: "80px",

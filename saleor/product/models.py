@@ -1,37 +1,46 @@
 from decimal import Decimal
+from typing import Iterable
 from uuid import uuid4
 
 from django.conf import settings
 from django.contrib.postgres.fields import HStoreField, JSONField
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.db.models import F
 from django.urls import reverse
 from django.utils.encoding import smart_text
+from django.utils.html import strip_tags
 from django.utils.text import slugify
 from django.utils.translation import pgettext_lazy
 from django_measurement.models import MeasurementField
 from django_prices.models import MoneyField
 from django_prices.templatetags import prices_i18n
+from draftjs_sanitizer import clean_draft_js
 from measurement.measures import Weight
 from mptt.managers import TreeManager
 from mptt.models import MPTTModel
-from prices import TaxedMoneyRange
+from prices import MoneyRange
 from text_unidecode import unidecode
 from versatileimagefield.fields import PPOIField, VersatileImageField
 
-from saleor.core.utils import build_absolute_uri
-
-from ..core import TaxRateType
 from ..core.exceptions import InsufficientStock
-from ..core.models import PublishableModel, SortableModel
-from ..core.utils.taxes import apply_tax_to_price
+from ..core.fields import SanitizedJSONField
+from ..core.models import (
+    ModelWithMetadata,
+    PublishableModel,
+    PublishedQuerySet,
+    SortableModel,
+)
+from ..core.utils import build_absolute_uri
+from ..core.utils.draftjs import json_content_to_raw_text
 from ..core.utils.translations import TranslationProxy
 from ..core.weight import WeightUnits, zero_weight
+from ..discount import DiscountInfo
 from ..discount.utils import calculate_discounted_price
 from ..seo.models import SeoModel, SeoModelTranslation
 
 
-class Category(MPTTModel, SeoModel):
+class Category(MPTTModel, ModelWithMetadata, SeoModel):
     name = models.CharField(max_length=128)
     slug = models.SlugField(max_length=128)
     description = models.TextField(blank=True)
@@ -82,12 +91,11 @@ class CategoryTranslation(SeoModelTranslation):
         )
 
 
-class ProductType(models.Model):
+class ProductType(ModelWithMetadata):
     name = models.CharField(max_length=128)
     has_variants = models.BooleanField(default=True)
     is_shipping_required = models.BooleanField(default=True)
     is_digital = models.BooleanField(default=False)
-    tax_rate = models.CharField(max_length=128, choices=TaxRateType.CHOICES)
     weight = MeasurementField(
         measurement=Weight, unit_choices=WeightUnits.CHOICES, default=zero_weight
     )
@@ -108,13 +116,24 @@ class ProductType(models.Model):
         )
 
 
-class Product(SeoModel, PublishableModel):
+class ProductsQueryset(PublishedQuerySet):
+    def collection_sorted(self, user):
+        qs = self.visible_to_user(user).prefetch_related(
+            "collections__products__collectionproduct"
+        )
+        qs = qs.order_by(F("collectionproduct__sort_order").asc(nulls_last=True))
+        return qs
+
+
+class Product(SeoModel, ModelWithMetadata, PublishableModel):
     product_type = models.ForeignKey(
         ProductType, related_name="products", on_delete=models.CASCADE
     )
     name = models.CharField(max_length=128)
     description = models.TextField(blank=True)
-    description_json = JSONField(blank=True, default=dict)
+    description_json = SanitizedJSONField(
+        blank=True, default=dict, sanitizer=clean_draft_js
+    )
     category = models.ForeignKey(
         Category, related_name="products", on_delete=models.CASCADE
     )
@@ -126,11 +145,10 @@ class Product(SeoModel, PublishableModel):
     attributes = HStoreField(default=dict, blank=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
     charge_taxes = models.BooleanField(default=True)
-    tax_rate = models.CharField(max_length=128, blank=True, choices=TaxRateType.CHOICES)
     weight = MeasurementField(
         measurement=Weight, unit_choices=WeightUnits.CHOICES, blank=True, null=True
     )
-
+    objects = ProductsQueryset.as_manager()
     translated = TranslationProxy()
 
     class Meta:
@@ -161,6 +179,12 @@ class Product(SeoModel, PublishableModel):
         return self.name
 
     @property
+    def plain_text_description(self):
+        if settings.USE_JSON_CONTENT:
+            return json_content_to_raw_text(self.description_json)
+        return strip_tags(self.description)
+
+    @property
     def is_available(self):
         return self.is_visible and self.is_in_stock()
 
@@ -179,18 +203,12 @@ class Product(SeoModel, PublishableModel):
         images = list(self.images.all())
         return images[0] if images else None
 
-    def get_price_range(self, discounts=None, taxes=None):
+    def get_price_range(self, discounts: Iterable[DiscountInfo] = None):
         if self.variants.all():
-            prices = [
-                variant.get_price(discounts=discounts, taxes=taxes) for variant in self
-            ]
-            return TaxedMoneyRange(min(prices), max(prices))
+            prices = [variant.get_price(discounts) for variant in self]
+            return MoneyRange(min(prices), max(prices))
         price = calculate_discounted_price(self, self.price, discounts)
-        if not self.charge_taxes:
-            taxes = None
-        tax_rate = self.tax_rate or self.product_type.tax_rate
-        price = apply_tax_to_price(taxes, tax_rate, price)
-        return TaxedMoneyRange(start=price, stop=price)
+        return MoneyRange(start=price, stop=price)
 
 
 class ProductTranslation(SeoModelTranslation):
@@ -200,7 +218,9 @@ class ProductTranslation(SeoModelTranslation):
     )
     name = models.CharField(max_length=128)
     description = models.TextField(blank=True)
-    description_json = JSONField(blank=True, default=dict)
+    description_json = SanitizedJSONField(
+        blank=True, default=dict, sanitizer=clean_draft_js
+    )
 
     class Meta:
         unique_together = (("language_code", "product"),)
@@ -218,7 +238,7 @@ class ProductTranslation(SeoModelTranslation):
         )
 
 
-class ProductVariant(models.Model):
+class ProductVariant(ModelWithMetadata):
     sku = models.CharField(max_length=32, unique=True)
     name = models.CharField(max_length=255, blank=True)
     price_override = MoneyField(
@@ -279,14 +299,14 @@ class ProductVariant(models.Model):
 
     @property
     def base_price(self):
-        return self.price_override or self.product.price
+        return (
+            self.price_override
+            if self.price_override is not None
+            else self.product.price
+        )
 
-    def get_price(self, discounts=None, taxes=None):
-        price = calculate_discounted_price(self.product, self.base_price, discounts)
-        if not self.product.charge_taxes:
-            taxes = None
-        tax_rate = self.product.tax_rate or self.product.product_type.tax_rate
-        return apply_tax_to_price(taxes, tax_rate, price)
+    def get_price(self, discounts: Iterable[DiscountInfo] = None):
+        return calculate_discounted_price(self.product, self.base_price, discounts)
 
     def get_weight(self):
         return self.weight or self.product.weight or self.product.product_type.weight
@@ -325,7 +345,7 @@ class ProductVariant(models.Model):
         return images[0] if images else self.product.get_first_image()
 
     def get_ajax_label(self, discounts=None):
-        price = self.get_price(discounts).gross
+        price = self.get_price(discounts)
         return "%s, %s, %s" % (
             self.sku,
             self.display_product(),
@@ -358,7 +378,7 @@ class ProductVariantTranslation(models.Model):
         return self.name or str(self.product_variant)
 
 
-class DigitalContent(models.Model):
+class DigitalContent(ModelWithMetadata):
     FILE = "file"
     TYPE_CHOICES = (
         (FILE, pgettext_lazy("File as a digital product", "digital_product")),
@@ -404,7 +424,7 @@ class DigitalContentUrl(models.Model):
         return build_absolute_uri(url)
 
 
-class Attribute(models.Model):
+class Attribute(ModelWithMetadata):
     slug = models.SlugField(max_length=50)
     name = models.CharField(max_length=50)
     product_type = models.ForeignKey(
@@ -529,10 +549,28 @@ class VariantImage(models.Model):
     )
 
 
-class Collection(SeoModel, PublishableModel):
+class CollectionProduct(SortableModel):
+    collection = models.ForeignKey(
+        "Collection", related_name="collectionproduct", on_delete=models.CASCADE
+    )
+    product = models.ForeignKey(
+        Product, related_name="collectionproduct", on_delete=models.CASCADE
+    )
+
+    def get_ordering_queryset(self):
+        return self.product.collectionproduct.all()
+
+
+class Collection(SeoModel, ModelWithMetadata, PublishableModel):
     name = models.CharField(max_length=128, unique=True)
     slug = models.SlugField(max_length=128)
-    products = models.ManyToManyField(Product, blank=True, related_name="collections")
+    products = models.ManyToManyField(
+        Product,
+        blank=True,
+        related_name="collections",
+        through=CollectionProduct,
+        through_fields=["collection", "product"],
+    )
     background_image = VersatileImageField(
         upload_to="collection-backgrounds", blank=True, null=True
     )

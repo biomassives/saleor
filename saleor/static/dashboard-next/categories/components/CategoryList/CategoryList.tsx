@@ -1,6 +1,5 @@
 import Button from "@material-ui/core/Button";
 import Card from "@material-ui/core/Card";
-import Checkbox from "@material-ui/core/Checkbox";
 import {
   createStyles,
   Theme,
@@ -12,15 +11,16 @@ import TableBody from "@material-ui/core/TableBody";
 import TableCell from "@material-ui/core/TableCell";
 import TableFooter from "@material-ui/core/TableFooter";
 import TableRow from "@material-ui/core/TableRow";
-import * as React from "react";
+import React from "react";
 
-import CardTitle from "../../../components/CardTitle";
-import Skeleton from "../../../components/Skeleton";
-import TableHead from "../../../components/TableHead";
-import TablePagination from "../../../components/TablePagination";
-import i18n from "../../../i18n";
-import { renderCollection } from "../../../misc";
-import { ListActions, ListProps } from "../../../types";
+import CardTitle from "@saleor/components/CardTitle";
+import Checkbox from "@saleor/components/Checkbox";
+import Skeleton from "@saleor/components/Skeleton";
+import TableHead from "@saleor/components/TableHead";
+import TablePagination from "@saleor/components/TablePagination";
+import i18n from "@saleor/i18n";
+import { renderCollection } from "@saleor/misc";
+import { ListActions, ListProps } from "@saleor/types";
 
 const styles = (theme: Theme) =>
   createStyles({
@@ -35,7 +35,9 @@ const styles = (theme: Theme) =>
         width: 160
       }
     },
-    colName: {},
+    colName: {
+      paddingLeft: "0 !important"
+    },
     colProducts: {
       textAlign: "center"
     },
@@ -70,15 +72,18 @@ const CategoryList = withStyles(styles, { name: "CategoryList" })(
     categories,
     classes,
     disabled,
+    settings,
     isRoot,
     pageInfo,
     isChecked,
     selected,
     toggle,
+    toggleAll,
     toolbar,
     onAdd,
     onNextPage,
     onPreviousPage,
+    onUpdateListSettings,
     onRowClick
   }: CategoryListProps) => (
     <Card>
@@ -93,28 +98,31 @@ const CategoryList = withStyles(styles, { name: "CategoryList" })(
         />
       )}
       <Table>
-        <TableHead selected={selected} toolbar={toolbar}>
-          <TableRow>
-            <TableCell />
-            <TableCell className={classes.colName}>
-              {i18n.t("Category Name", { context: "object" })}
-            </TableCell>
-            <TableCell className={classes.colSubcategories}>
-              {i18n.t("Subcategories", { context: "object" })}
-            </TableCell>
-            <TableCell className={classes.colProducts}>
-              {i18n
-                .t("No. Products", { context: "object" })
-                .replace(" ", "\xa0")}
-            </TableCell>
-          </TableRow>
+        <TableHead
+          selected={selected}
+          disabled={disabled}
+          items={categories}
+          toggleAll={toggleAll}
+          toolbar={toolbar}
+        >
+          <TableCell className={classes.colName}>
+            {i18n.t("Category Name", { context: "object" })}
+          </TableCell>
+          <TableCell className={classes.colSubcategories}>
+            {i18n.t("Subcategories", { context: "object" })}
+          </TableCell>
+          <TableCell className={classes.colProducts}>
+            {i18n.t("No. Products", { context: "object" }).replace(" ", "\xa0")}
+          </TableCell>
         </TableHead>
         <TableFooter>
           <TableRow>
             <TablePagination
               colSpan={4}
+              settings={settings}
               hasNextPage={pageInfo && !disabled ? pageInfo.hasNextPage : false}
               onNextPage={onNextPage}
+              onUpdateListSettings={onUpdateListSettings}
               hasPreviousPage={
                 pageInfo && !disabled ? pageInfo.hasPreviousPage : false
               }
@@ -138,13 +146,9 @@ const CategoryList = withStyles(styles, { name: "CategoryList" })(
                 >
                   <TableCell padding="checkbox">
                     <Checkbox
-                      color="primary"
                       checked={isSelected}
                       disabled={disabled}
-                      onClick={event => {
-                        toggle(category.id);
-                        event.stopPropagation();
-                      }}
+                      onChange={() => toggle(category.id)}
                     />
                   </TableCell>
                   <TableCell className={classes.colName}>

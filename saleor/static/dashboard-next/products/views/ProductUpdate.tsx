@@ -1,21 +1,22 @@
 import DialogContentText from "@material-ui/core/DialogContentText";
 import IconButton from "@material-ui/core/IconButton";
 import DeleteIcon from "@material-ui/icons/Delete";
-import * as React from "react";
+import React from "react";
 import { arrayMove } from "react-sortable-hoc";
 
-import * as placeholderImg from "../../../images/placeholder255x255.png";
-import ActionDialog from "../../components/ActionDialog";
-import { WindowTitle } from "../../components/WindowTitle";
-import useBulkActions from "../../hooks/useBulkActions";
-import useNavigator from "../../hooks/useNavigator";
-import useNotifier from "../../hooks/useNotifier";
+import ActionDialog from "@saleor/components/ActionDialog";
+import { WindowTitle } from "@saleor/components/WindowTitle";
+import useBulkActions from "@saleor/hooks/useBulkActions";
+import useNavigator from "@saleor/hooks/useNavigator";
+import useNotifier from "@saleor/hooks/useNotifier";
+import placeholderImg from "../../../images/placeholder255x255.png";
+import { DEFAULT_INITIAL_SEARCH_DATA } from "../../config";
+import SearchCategories from "../../containers/SearchCategories";
+import SearchCollections from "../../containers/SearchCollections";
 import i18n from "../../i18n";
 import { decimal, getMutationState, maybe } from "../../misc";
 import { productTypeUrl } from "../../productTypes/urls";
 import ProductUpdatePage, { FormData } from "../components/ProductUpdatePage";
-import { CategorySearchProvider } from "../containers/CategorySearch";
-import { CollectionSearchProvider } from "../containers/CollectionSearch";
 import ProductUpdateOperations from "../containers/ProductUpdateOperations";
 import { TypedProductDetailsQuery } from "../queries";
 import {
@@ -43,18 +44,15 @@ export const ProductUpdate: React.StatelessComponent<ProductUpdateProps> = ({
 }) => {
   const navigate = useNavigator();
   const notify = useNotifier();
-  const { isSelected, listElements, reset, toggle } = useBulkActions(
+  const { isSelected, listElements, reset, toggle, toggleAll } = useBulkActions(
     params.ids
   );
 
   return (
-    <CategorySearchProvider>
-      {({ search: searchCategories, searchOpts: searchCategoriesOpts }) => (
-        <CollectionSearchProvider>
-          {({
-            search: searchCollections,
-            searchOpts: searchCollectionsOpts
-          }) => (
+    <SearchCategories variables={DEFAULT_INITIAL_SEARCH_DATA}>
+      {({ search: searchCategories, result: searchCategoriesOpts }) => (
+        <SearchCollections variables={DEFAULT_INITIAL_SEARCH_DATA}>
+          {({ search: searchCollections, result: searchCollectionsOpts }) => (
             <TypedProductDetailsQuery
               displayLoader
               require={["product"]}
@@ -124,6 +122,7 @@ export const ProductUpdate: React.StatelessComponent<ProductUpdateProps> = ({
                           if (product.productType.hasVariants) {
                             updateProduct.mutate({
                               attributes: data.attributes,
+                              basePrice: decimal(data.basePrice),
                               category: data.category.value,
                               chargeTaxes: data.chargeTaxes,
                               collections: data.collections.map(
@@ -131,17 +130,21 @@ export const ProductUpdate: React.StatelessComponent<ProductUpdateProps> = ({
                               ),
                               descriptionJson: JSON.stringify(data.description),
                               id: product.id,
-                              isPublished: data.available,
+                              isPublished: data.isPublished,
                               name: data.name,
-                              price: decimal(data.price),
                               publicationDate:
                                 data.publicationDate !== ""
                                   ? data.publicationDate
-                                  : null
+                                  : null,
+                              seo: {
+                                description: data.seoDescription,
+                                title: data.seoTitle,
+                              }
                             });
                           } else {
                             updateSimpleProduct.mutate({
                               attributes: data.attributes,
+                              basePrice: decimal(data.basePrice),
                               category: data.category.value,
                               chargeTaxes: data.chargeTaxes,
                               collections: data.collections.map(
@@ -149,9 +152,8 @@ export const ProductUpdate: React.StatelessComponent<ProductUpdateProps> = ({
                               ),
                               descriptionJson: JSON.stringify(data.description),
                               id: product.id,
-                              isPublished: data.available,
+                              isPublished: data.isPublished,
                               name: data.name,
-                              price: decimal(data.price),
                               productVariantId: product.variants[0].id,
                               productVariantInput: {
                                 quantity: data.stockQuantity,
@@ -160,7 +162,11 @@ export const ProductUpdate: React.StatelessComponent<ProductUpdateProps> = ({
                               publicationDate:
                                 data.publicationDate !== ""
                                   ? data.publicationDate
-                                  : null
+                                  : null,
+                              seo: {
+                                description: data.seoDescription,
+                                title: data.seoTitle,
+                              }
                             });
                           }
                         }
@@ -303,6 +309,7 @@ export const ProductUpdate: React.StatelessComponent<ProductUpdateProps> = ({
                             isChecked={isSelected}
                             selected={listElements.length}
                             toggle={toggle}
+                            toggleAll={toggleAll}
                           />
                           <ActionDialog
                             open={params.action === "remove"}
@@ -359,9 +366,9 @@ export const ProductUpdate: React.StatelessComponent<ProductUpdateProps> = ({
               }}
             </TypedProductDetailsQuery>
           )}
-        </CollectionSearchProvider>
+        </SearchCollections>
       )}
-    </CategorySearchProvider>
+    </SearchCategories>
   );
 };
 export default ProductUpdate;

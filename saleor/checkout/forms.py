@@ -1,21 +1,21 @@
 """Checkout-related forms and fields."""
-from datetime import date
 from typing import Any
 
 from django import forms
 from django.conf import settings
-from django.core.exceptions import NON_FIELD_ERRORS, ObjectDoesNotExist
+from django.core.exceptions import NON_FIELD_ERRORS
+from django.utils import timezone
 from django.utils.encoding import smart_text
 from django.utils.safestring import mark_safe
 from django.utils.translation import npgettext_lazy, pgettext_lazy
-from django_countries.fields import LazyTypedChoiceField
+from django_countries.fields import Country, LazyTypedChoiceField
 
 from ..core.exceptions import InsufficientStock
+from ..core.taxes import display_gross_prices
+from ..core.taxes.interface import apply_taxes_to_shipping
 from ..core.utils import format_money
-from ..core.utils.taxes import display_gross_prices, get_taxed_shipping_price
 from ..discount.models import NotApplicable, Voucher
 from ..shipping.models import ShippingMethod, ShippingZone
-from ..shipping.utils import get_shipping_price_estimate
 from .models import Checkout
 
 
@@ -69,7 +69,8 @@ class AddToCheckoutForm(forms.Form):
         self.checkout = kwargs.pop("checkout")
         self.product = kwargs.pop("product")
         self.discounts = kwargs.pop("discounts", ())
-        self.taxes = kwargs.pop("taxes", {})
+        self.country = kwargs.pop("country", {})
+        self.taxes = kwargs.pop("taxes", None)
         super().__init__(*args, **kwargs)
 
     def add_error_i18n(self, field, error_name, fmt: Any = tuple()):
@@ -85,9 +86,8 @@ class AddToCheckoutForm(forms.Form):
         quantity = cleaned_data.get("quantity")
         if quantity is None:
             return cleaned_data
-        try:
-            variant = self.get_variant(cleaned_data)
-        except ObjectDoesNotExist:
+        variant = self.get_variant(cleaned_data)
+        if variant is None:
             self.add_error_i18n(NON_FIELD_ERRORS, "variant-does-not-exists")
         else:
             line = self.checkout.get_line(variant)
@@ -189,7 +189,6 @@ class CountryForm(forms.Form):
     )
 
     def __init__(self, *args, **kwargs):
-        self.taxes = kwargs.pop("taxes", {})
         super().__init__(*args, **kwargs)
         available_countries = {
             (country.code, country.name)
@@ -200,12 +199,16 @@ class CountryForm(forms.Form):
             available_countries, key=lambda choice: choice[1]
         )
 
-    def get_shipping_price_estimate(self, price, weight):
+    def get_shipping_price_estimate(self, checkout, discounts):
         """Return a shipping price range for given order for the selected
         country.
         """
-        code = self.cleaned_data["country"]
-        return get_shipping_price_estimate(price, weight, code, self.taxes)
+        from .utils import get_shipping_price_estimate
+
+        country = self.cleaned_data["country"]
+        if isinstance(country, str):
+            country = Country(country)
+        return get_shipping_price_estimate(checkout, discounts, country)
 
 
 class AnonymousUserShippingForm(forms.ModelForm):
@@ -290,16 +293,17 @@ class ShippingMethodChoiceField(forms.ModelChoiceField):
     prices.
     """
 
-    taxes = None
+    shipping_address = None
     widget = forms.RadioSelect()
 
     def label_from_instance(self, obj):
         """Return a friendly label for the shipping method."""
-        price = get_taxed_shipping_price(obj.price, self.taxes)
         if display_gross_prices():
-            price = price.gross
+            price = apply_taxes_to_shipping(
+                obj.price, shipping_address=self.shipping_address
+            ).gross
         else:
-            price = price.net
+            price = obj.price
         price_html = format_money(price)
         label = mark_safe("%s %s" % (obj.name, price_html))
         return label
@@ -317,17 +321,17 @@ class CheckoutShippingMethodForm(forms.ModelForm):
         fields = ["shipping_method"]
 
     def __init__(self, *args, **kwargs):
+        from .utils import get_valid_shipping_methods_for_checkout
+
         discounts = kwargs.pop("discounts")
-        taxes = kwargs.pop("taxes")
         super().__init__(*args, **kwargs)
-        country_code = self.instance.shipping_address.country.code
-        qs = ShippingMethod.objects.applicable_shipping_methods(
-            price=self.instance.get_subtotal(discounts, taxes).gross,
-            weight=self.instance.get_total_weight(),
-            country_code=country_code,
+        shipping_address = self.instance.shipping_address
+        country_code = shipping_address.country.code
+        qs = get_valid_shipping_methods_for_checkout(
+            self.instance, discounts, country_code=country_code
         )
         self.fields["shipping_method"].queryset = qs
-        self.fields["shipping_method"].taxes = taxes
+        self.fields["shipping_method"].shipping_address = shipping_address
 
         if self.initial.get("shipping_method") is None:
             shipping_methods = qs.all()
@@ -379,7 +383,7 @@ class CheckoutVoucherForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["voucher"].queryset = Voucher.objects.active(date=date.today())
+        self.fields["voucher"].queryset = Voucher.objects.active(date=timezone.now())
 
     def clean(self):
         from .utils import get_voucher_discount_for_checkout

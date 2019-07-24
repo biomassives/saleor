@@ -5,7 +5,7 @@ import {
   WithStyles
 } from "@material-ui/core/styles";
 import Typography from "@material-ui/core/Typography";
-import * as React from "react";
+import React from "react";
 
 import ExtendedPageHeader from "../ExtendedPageHeader";
 import Skeleton from "../Skeleton";
@@ -30,7 +30,7 @@ const PageHeader = withStyles(styles)(
     <ExtendedPageHeader
       className={className}
       title={
-        <Typography className={classes.title} variant="headline">
+        <Typography className={classes.title} variant="h5">
           {title !== undefined ? title : <Skeleton style={{ width: "10em" }} />}
         </Typography>
       }

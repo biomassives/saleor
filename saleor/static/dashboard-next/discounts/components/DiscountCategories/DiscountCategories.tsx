@@ -1,6 +1,5 @@
 import Button from "@material-ui/core/Button";
 import Card from "@material-ui/core/Card";
-import Checkbox from "@material-ui/core/Checkbox";
 import IconButton from "@material-ui/core/IconButton";
 import {
   createStyles,
@@ -14,12 +13,13 @@ import TableCell from "@material-ui/core/TableCell";
 import TableFooter from "@material-ui/core/TableFooter";
 import TableRow from "@material-ui/core/TableRow";
 import DeleteIcon from "@material-ui/icons/Delete";
-import * as React from "react";
+import React from "react";
 
-import CardTitle from "../../../components/CardTitle";
-import Skeleton from "../../../components/Skeleton";
-import TableHead from "../../../components/TableHead";
-import TablePagination from "../../../components/TablePagination";
+import CardTitle from "@saleor/components/CardTitle";
+import Checkbox from "@saleor/components/Checkbox";
+import Skeleton from "@saleor/components/Skeleton";
+import TableHead from "@saleor/components/TableHead";
+import TablePagination from "@saleor/components/TablePagination";
 import i18n from "../../../i18n";
 import { maybe, renderCollection } from "../../../misc";
 import { ListActions, ListProps } from "../../../types";
@@ -65,24 +65,28 @@ const DiscountCategories = withStyles(styles, {
     onNextPage,
     toolbar,
     toggle,
+    toggleAll,
     selected,
     isChecked
   }: DiscountCategoriesProps & WithStyles<typeof styles>) => (
     <Card>
       <CardTitle
-        title={i18n.t("Categories assigned to {{ saleName }}", {
-          saleName: maybe(() => sale.name)
-        })}
+        title={i18n.t("Eligible Categories")}
         toolbar={
-          <Button variant="flat" color="primary" onClick={onCategoryAssign}>
+          <Button color="primary" onClick={onCategoryAssign}>
             {i18n.t("Assign categories")}
           </Button>
         }
       />
       <Table>
-        <TableHead selected={selected} toolbar={toolbar}>
-          <TableRow>
-            <TableCell />
+        <TableHead
+          selected={selected}
+          disabled={disabled}
+          items={maybe(() => sale.categories.edges.map(edge => edge.node))}
+          toggleAll={toggleAll}
+          toolbar={toolbar}
+        >
+          <>
             <TableCell className={classes.wideColumn}>
               {i18n.t("Category name")}
             </TableCell>
@@ -90,7 +94,7 @@ const DiscountCategories = withStyles(styles, {
               {i18n.t("Products")}
             </TableCell>
             <TableCell />
-          </TableRow>
+          </>
         </TableHead>
         <TableFooter>
           <TableRow>
@@ -121,13 +125,9 @@ const DiscountCategories = withStyles(styles, {
                 >
                   <TableCell padding="checkbox">
                     <Checkbox
-                      color="primary"
                       checked={isSelected}
                       disabled={disabled}
-                      onClick={event => {
-                        toggle(category.id);
-                        event.stopPropagation();
-                      }}
+                      onChange={() => toggle(category.id)}
                     />
                   </TableCell>
                   <TableCell>

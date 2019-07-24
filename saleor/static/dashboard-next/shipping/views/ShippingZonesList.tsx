@@ -1,17 +1,21 @@
 import DialogContentText from "@material-ui/core/DialogContentText";
 import IconButton from "@material-ui/core/IconButton";
 import DeleteIcon from "@material-ui/icons/Delete";
-import * as React from "react";
+import React from "react";
 
-import ActionDialog from "../../components/ActionDialog";
-import { configurationMenuUrl } from "../../configuration";
-import useBulkActions from "../../hooks/useBulkActions";
-import useNavigator from "../../hooks/useNavigator";
-import useNotifier from "../../hooks/useNotifier";
-import usePaginator, { createPaginationState } from "../../hooks/usePaginator";
-import useShop from "../../hooks/useShop";
-import i18n from "../../i18n";
-import { getMutationState, maybe } from "../../misc";
+import ActionDialog from "@saleor/components/ActionDialog";
+import { configurationMenuUrl } from "@saleor/configuration";
+import useBulkActions from "@saleor/hooks/useBulkActions";
+import useListSettings from "@saleor/hooks/useListSettings";
+import useNavigator from "@saleor/hooks/useNavigator";
+import useNotifier from "@saleor/hooks/useNotifier";
+import usePaginator, {
+  createPaginationState
+} from "@saleor/hooks/usePaginator";
+import useShop from "@saleor/hooks/useShop";
+import i18n from "@saleor/i18n";
+import { getMutationState, maybe } from "@saleor/misc";
+import { ListViews } from "@saleor/types";
 import ShippingZonesListPage from "../components/ShippingZonesListPage";
 import {
   TypedBulkDeleteShippingZone,
@@ -33,8 +37,6 @@ interface ShippingZonesListProps {
   params: ShippingZonesListUrlQueryParams;
 }
 
-const PAGINATE_BY = 20;
-
 export const ShippingZonesList: React.StatelessComponent<
   ShippingZonesListProps
 > = ({ params }) => {
@@ -42,11 +44,14 @@ export const ShippingZonesList: React.StatelessComponent<
   const notify = useNotifier();
   const paginate = usePaginator();
   const shop = useShop();
-  const { isSelected, listElements, reset, toggle } = useBulkActions(
+  const { isSelected, listElements, reset, toggle, toggleAll } = useBulkActions(
     params.ids
   );
+  const { updateListSettings, settings } = useListSettings(
+    ListViews.SHIPPING_METHODS_LIST
+  );
 
-  const paginationState = createPaginationState(PAGINATE_BY, params);
+  const paginationState = createPaginationState(settings.rowNumber, params);
 
   return (
     <TypedShippingZones displayLoader variables={paginationState}>
@@ -144,6 +149,7 @@ export const ShippingZonesList: React.StatelessComponent<
                             defaultWeightUnit={maybe(
                               () => shop.defaultWeightUnit
                             )}
+                            settings={settings}
                             disabled={
                               loading ||
                               deleteShippingZoneOpts.loading ||
@@ -155,6 +161,7 @@ export const ShippingZonesList: React.StatelessComponent<
                             pageInfo={pageInfo}
                             onAdd={() => navigate(shippingZoneAddUrl)}
                             onBack={() => navigate(configurationMenuUrl)}
+                            onUpdateListSettings={updateListSettings}
                             onNextPage={loadNextPage}
                             onPreviousPage={loadPreviousPage}
                             onRemove={id =>
@@ -176,6 +183,7 @@ export const ShippingZonesList: React.StatelessComponent<
                             isChecked={isSelected}
                             selected={listElements.length}
                             toggle={toggle}
+                            toggleAll={toggleAll}
                             toolbar={
                               <IconButton
                                 color="primary"

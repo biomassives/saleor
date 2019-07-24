@@ -134,6 +134,7 @@
                 <input class="form-control" type="text" name="q"
                        value="{% if query %}{{ query }}{% endif %}"
                        placeholder="{% trans "Search for product" %}"
+                       autocomplete="off"
                        required>
                 <button class="btn btn-primary" type="submit">
                   {% trans "Search" %} <svg data-src="{% static "images/search.svg" %}" width="18" height="18"/>
@@ -145,7 +146,7 @@
             <div class="navbar__brand__checkout float-right">
               <a rel="nofollow" class="checkout__icon" href="{% url "checkout:index" %}">
                 <span class="checkout-label d-none d-md-inline-block">
-                  {% trans "Your Checkout" context "Main navigation item" %}
+                  {% trans "Your cart" context "Main navigation item" %}
                 </span>
                 <div class="navbar__brand__checkout__icon">
                   <svg data-src="{% static "images/checkout.svg" %}" width="24" height="24"/>
@@ -205,7 +206,7 @@
             <hr />
             <li>
               <a rel="nofollow" href="{% url "checkout:index" %}">
-                {% trans "Your Checkout" context "Main navigation item" %}
+                {% trans "Your cart" context "Main navigation item" %}
               </a>
             </li>
             {% if user.is_authenticated %}

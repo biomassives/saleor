@@ -13,7 +13,7 @@ import {
 import Typography from "@material-ui/core/Typography";
 import DeleteIcon from "@material-ui/icons/Delete";
 import { ContentState } from "draft-js";
-import * as React from "react";
+import React from "react";
 
 import i18n from "../../i18n";
 import Link from "../Link";
@@ -37,6 +37,9 @@ const styles = (theme: Theme) =>
     },
     inline: {
       display: "inline-block"
+    },
+    popover: {
+      zIndex: 1
     },
     root: {
       alignItems: "center",
@@ -76,6 +79,7 @@ const LinkEntity = withStyles(styles, {
       <>
         <div className={classes.anchor} ref={anchor}>
           <Popper
+            className={classes.popover}
             open={isOpened}
             anchorEl={anchor.current}
             transition
@@ -92,8 +96,8 @@ const LinkEntity = withStyles(styles, {
                 <Paper className={classes.root}>
                   <ClickAwayListener onClickAway={disable} mouseEvent="onClick">
                     <div className={classes.container}>
-                      <Typography className={classes.inline} variant="body1">
-                        {contentState.getEntity(entityKey).getData().href}
+                      <Typography className={classes.inline} variant="body2">
+                        {contentState.getEntity(entityKey).getData().url}
                       </Typography>
                       <span className={classes.separator} />
                       <Button
@@ -102,7 +106,6 @@ const LinkEntity = withStyles(styles, {
                           onEdit(entityKey);
                         }}
                         color="primary"
-                        variant="flat"
                       >
                         {i18n.t("Edit")}
                       </Button>
@@ -117,7 +120,7 @@ const LinkEntity = withStyles(styles, {
           </Popper>
         </div>
         <Link
-          href={contentState.getEntity(entityKey).getData().href}
+          href={contentState.getEntity(entityKey).getData().url}
           onClick={toggle}
         >
           {children}

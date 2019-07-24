@@ -1,5 +1,4 @@
 import Card from "@material-ui/core/Card";
-import Checkbox from "@material-ui/core/Checkbox";
 import {
   createStyles,
   Theme,
@@ -12,13 +11,14 @@ import TableCell from "@material-ui/core/TableCell";
 import TableFooter from "@material-ui/core/TableFooter";
 import TableRow from "@material-ui/core/TableRow";
 import Typography from "@material-ui/core/Typography";
-import * as React from "react";
+import React from "react";
 
-import Skeleton from "../../../components/Skeleton";
-import TableHead from "../../../components/TableHead";
-import TablePagination from "../../../components/TablePagination";
+import Checkbox from "@saleor/components/Checkbox";
+import Skeleton from "@saleor/components/Skeleton";
+import TableHead from "@saleor/components/TableHead";
+import TablePagination from "@saleor/components/TablePagination";
 import i18n from "../../../i18n";
-import { maybe, renderCollection, translatedTaxRates } from "../../../misc";
+import { maybe, renderCollection } from "../../../misc";
 import { ListActions, ListProps } from "../../../types";
 import { ProductTypeList_productTypes_edges_node } from "../../types/ProductTypeList";
 
@@ -60,23 +60,27 @@ const ProductTypeList = withStyles(styles, { name: "ProductTypeList" })(
     isChecked,
     selected,
     toggle,
+    toggleAll,
     toolbar
   }: ProductTypeListProps) => (
     <Card>
       <Table>
-        <TableHead selected={selected} toolbar={toolbar}>
-          <TableRow>
-            <TableCell />
-            <TableCell className={classes.colName}>
-              {i18n.t("Type Name", { context: "table header" })}
-            </TableCell>
-            <TableCell className={classes.colType}>
-              {i18n.t("Type", { context: "table header" })}
-            </TableCell>
-            <TableCell className={classes.colTax}>
-              {i18n.t("Tax", { context: "table header" })}
-            </TableCell>
-          </TableRow>
+        <TableHead
+          selected={selected}
+          disabled={disabled}
+          items={productTypes}
+          toggleAll={toggleAll}
+          toolbar={toolbar}
+        >
+          <TableCell className={classes.colName}>
+            {i18n.t("Type Name", { context: "table header" })}
+          </TableCell>
+          <TableCell className={classes.colType}>
+            {i18n.t("Type", { context: "table header" })}
+          </TableCell>
+          <TableCell className={classes.colTax}>
+            {i18n.t("Tax", { context: "table header" })}
+          </TableCell>
         </TableHead>
         <TableFooter>
           <TableRow>
@@ -108,13 +112,9 @@ const ProductTypeList = withStyles(styles, { name: "ProductTypeList" })(
                 >
                   <TableCell padding="checkbox">
                     <Checkbox
-                      color="primary"
                       checked={isSelected}
                       disabled={disabled}
-                      onClick={event => {
-                        toggle(productType.id);
-                        event.stopPropagation();
-                      }}
+                      onChange={() => toggle(productType.id)}
                     />
                   </TableCell>
                   <TableCell className={classes.colName}>
@@ -148,8 +148,8 @@ const ProductTypeList = withStyles(styles, { name: "ProductTypeList" })(
                     )}
                   </TableCell>
                   <TableCell className={classes.colTax}>
-                    {maybe(() => productType.taxRate) ? (
-                      translatedTaxRates()[productType.taxRate]
+                    {maybe(() => productType.taxType) ? (
+                      productType.taxType.description
                     ) : (
                       <Skeleton />
                     )}

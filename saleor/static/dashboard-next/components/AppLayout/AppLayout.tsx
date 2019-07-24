@@ -1,6 +1,8 @@
+import Avatar from "@material-ui/core/Avatar";
 import Chip from "@material-ui/core/Chip";
 import ClickAwayListener from "@material-ui/core/ClickAwayListener";
 import Grow from "@material-ui/core/Grow";
+import Hidden from "@material-ui/core/Hidden";
 import LinearProgress from "@material-ui/core/LinearProgress";
 import MenuItem from "@material-ui/core/MenuItem";
 import Menu from "@material-ui/core/MenuList";
@@ -12,29 +14,28 @@ import {
   withStyles,
   WithStyles
 } from "@material-ui/core/styles";
-import * as classNames from "classnames";
-import * as React from "react";
+import classNames from "classnames";
+import React from "react";
 import SVG from "react-inlinesvg";
 import { RouteComponentProps, withRouter } from "react-router";
 
-import * as saleorDarkLogo from "../../../images/logo-dark.svg";
-import * as saleorLightLogo from "../../../images/logo-light.svg";
-import {
-  appLoaderHeight,
-  drawerWidth
-} from "../../components/AppLayout/consts";
-import MenuList from "../../components/AppLayout/MenuList";
-import menuStructure from "../../components/AppLayout/menuStructure";
-import ResponsiveDrawer from "../../components/AppLayout/ResponsiveDrawer";
-import AppProgressProvider from "../../components/AppProgress";
-import useNavigator from "../../hooks/useNavigator";
-import useTheme from "../../hooks/useTheme";
-import useUser from "../../hooks/useUser";
+import AppProgressProvider from "@saleor/components/AppProgress";
+import useLocalStorage from "@saleor/hooks/useLocalStorage";
+import useNavigator from "@saleor/hooks/useNavigator";
+import useTheme from "@saleor/hooks/useTheme";
+import useUser from "@saleor/hooks/useUser";
+import saleorDarkLogoSmall from "../../../images/logo-dark-small.svg";
+import saleorDarkLogo from "../../../images/logo-dark.svg";
+import menuArrowIcon from "../../../images/menu-arrow-icon.svg";
 import i18n from "../../i18n";
 import ArrowDropdown from "../../icons/ArrowDropdown";
 import Container from "../Container";
 import AppActionContext from "./AppActionContext";
 import AppHeaderContext from "./AppHeaderContext";
+import { appLoaderHeight, drawerWidth, drawerWidthExpanded } from "./consts";
+import MenuList from "./MenuList";
+import menuStructure from "./menuStructure";
+import ResponsiveDrawer from "./ResponsiveDrawer";
 import ThemeSwitch from "./ThemeSwitch";
 
 const styles = (theme: Theme) =>
@@ -42,7 +43,8 @@ const styles = (theme: Theme) =>
     appAction: {
       bottom: 0,
       gridColumn: 2,
-      position: "sticky"
+      position: "sticky",
+      zIndex: 1
     },
     appLoader: {
       height: appLoaderHeight,
@@ -53,9 +55,18 @@ const styles = (theme: Theme) =>
       transition: theme.transitions.duration.standard + "ms"
     },
     content: {
-      display: "flex",
-      flexDirection: "column",
-      minHeight: `calc(100vh - ${appLoaderHeight}px)`
+      [theme.breakpoints.down("sm")]: {
+        paddingLeft: 0
+      },
+      paddingLeft: drawerWidthExpanded,
+      transition: "padding-left 0.5s ease",
+      width: "100%"
+    },
+    contentToggle: {
+      [theme.breakpoints.down("sm")]: {
+        paddingLeft: 0
+      },
+      paddingLeft: drawerWidth
     },
     darkThemeSwitch: {
       marginRight: theme.spacing.unit * 2
@@ -69,20 +80,72 @@ const styles = (theme: Theme) =>
     hide: {
       opacity: 0
     },
+    isMenuSmall: {
+      "& path": {
+        fill: theme.palette.primary.main
+      },
+      "& span": {
+        margin: "0 8px"
+      },
+      "& svg": {
+        marginTop: 12,
+        transform: "rotate(180deg)"
+      },
+      "&:hover": {
+        background: "#E6F3F3"
+      },
+      background: theme.palette.background.paper,
+      border: `solid 1px #EAEAEA`,
+      borderRadius: "50%",
+      cursor: "pointer",
+      height: 32,
+      position: "absolute",
+      right: -16,
+      top: 65,
+      transition: `background ${theme.transitions.duration.shorter}ms`,
+      width: 32,
+      zIndex: 99
+    },
+    isMenuSmallDark: {
+      "&:hover": {
+        background: `linear-gradient(0deg, rgba(25, 195, 190, 0.1), rgba(25, 195, 190, 0.1)), ${
+          theme.palette.background.paper
+        }`
+      },
+      border: `solid 1px #252728`,
+      transition: `background  ${theme.transitions.duration.shorter}ms`
+    },
+    isMenuSmallHide: {
+      "& svg": {
+        transform: "rotate(0deg)"
+      }
+    },
     logo: {
       "& svg": {
-        height: "100%"
+        height: "100%",
+        margin: "20px 50px"
       },
+      background: theme.palette.secondary.main,
       display: "block",
-      height: 28
+      height: 80
+    },
+    logoDark: {
+      "& path": {
+        fill: theme.palette.common.white
+      },
+      background: theme.palette.primary.main
+    },
+    logoSmall: {
+      "& svg": {
+        margin: "0px 25px"
+      }
     },
     menu: {
-      marginTop: theme.spacing.unit * 4
+      background: theme.palette.background.paper,
+      height: "100vh",
+      padding: 25
     },
     menuIcon: {
-      [theme.breakpoints.up("md")]: {
-        display: "none"
-      },
       "& span": {
         "&:nth-child(1)": {
           top: 15
@@ -103,6 +166,9 @@ const styles = (theme: Theme) =>
         transition: ".25s ease-in-out",
         width: "60%"
       },
+      [theme.breakpoints.up("md")]: {
+        display: "none"
+      },
       background: theme.palette.background.paper,
       borderRadius: "50%",
       cursor: "pointer",
@@ -111,7 +177,7 @@ const styles = (theme: Theme) =>
       marginRight: theme.spacing.unit * 2,
       position: "relative",
       transform: "rotate(0deg)",
-      transition: ".2s ease-in-out",
+      transition: `${theme.transitions.duration.shorter}ms ease-in-out`,
       width: 42
     },
     menuIconDark: {
@@ -137,15 +203,16 @@ const styles = (theme: Theme) =>
       position: "absolute",
       zIndex: 1999
     },
+    menuSmall: {
+      background: theme.palette.background.paper,
+      height: "100vh",
+      padding: 25
+    },
     popover: {
       zIndex: 1
     },
     root: {
-      [theme.breakpoints.down("sm")]: {
-        gridTemplateColumns: "1fr"
-      },
-      display: "grid",
-      gridTemplateColumns: `${drawerWidth}px 1fr`
+      width: `100%`
     },
     rotate: {
       transform: "rotate(180deg)"
@@ -155,7 +222,7 @@ const styles = (theme: Theme) =>
         padding: 0
       },
       background: theme.palette.background.paper,
-      padding: `${theme.spacing.unit * 2}px ${theme.spacing.unit * 4}px`
+      padding: `0 ${theme.spacing.unit * 4}px`
     },
     spacer: {
       flex: 1
@@ -165,8 +232,8 @@ const styles = (theme: Theme) =>
       display: "flex"
     },
     userChip: {
-      backgroundColor: theme.palette.common.white,
-      border: `1px solid ${theme.palette.grey[200]}`
+      backgroundColor: theme.palette.background.paper,
+      color: theme.palette.text.primary
     },
     userMenuContainer: {
       position: "relative"
@@ -193,7 +260,7 @@ interface AppLayoutProps {
 const AppLayout = withStyles(styles, {
   name: "AppLayout"
 })(
-  withRouter<AppLayoutProps & RouteComponentProps<any>>(
+  withRouter<AppLayoutProps & RouteComponentProps<any>, any>(
     ({
       classes,
       children,
@@ -202,6 +269,7 @@ const AppLayout = withStyles(styles, {
       WithStyles<typeof styles> &
       RouteComponentProps<any>) => {
       const { isDark, toggleTheme } = useTheme();
+      const [isMenuSmall, setMenuSmall] = useLocalStorage("isMenuSmall", false);
       const [isDrawerOpened, setDrawerState] = React.useState(false);
       const [isMenuOpened, setMenuState] = React.useState(false);
       const appActionAnchor = React.useRef<HTMLDivElement>();
@@ -225,6 +293,10 @@ const AppLayout = withStyles(styles, {
         navigate(url);
       };
 
+      const handleIsMenuSmall = () => {
+        setMenuSmall(!isMenuSmall);
+      };
+
       return (
         <AppProgressProvider>
           {({ isProgress }) => (
@@ -241,14 +313,37 @@ const AppLayout = withStyles(styles, {
                     <ResponsiveDrawer
                       onClose={() => setDrawerState(false)}
                       open={isDrawerOpened}
+                      small={!isMenuSmall}
                     >
-                      <SVG
-                        className={classes.logo}
-                        src={isDark ? saleorDarkLogo : saleorLightLogo}
-                      />
+                      <div
+                        className={classNames(classes.logo, {
+                          [classes.logoSmall]: isMenuSmall,
+                          [classes.logoDark]: isDark
+                        })}
+                      >
+                        <SVG
+                          src={
+                            isMenuSmall ? saleorDarkLogoSmall : saleorDarkLogo
+                          }
+                        />
+                      </div>
+                      <Hidden smDown>
+                        <div
+                          className={classNames(classes.isMenuSmall, {
+                            [classes.isMenuSmallHide]: isMenuSmall,
+                            [classes.isMenuSmallDark]: isDark
+                          })}
+                          onClick={handleIsMenuSmall}
+                        >
+                          <SVG src={menuArrowIcon} />
+                        </div>
+                      </Hidden>
                       <MenuList
-                        className={classes.menu}
+                        className={
+                          isMenuSmall ? classes.menuSmall : classes.menu
+                        }
                         menuItems={menuStructure}
+                        isMenuSmall={!isMenuSmall}
                         location={location.pathname}
                         user={user}
                         renderConfigure={true}
@@ -256,7 +351,11 @@ const AppLayout = withStyles(styles, {
                       />
                     </ResponsiveDrawer>
                   </div>
-                  <div className={classes.content}>
+                  <div
+                    className={classNames(classes.content, {
+                      [classes.contentToggle]: isMenuSmall
+                    })}
+                  >
                     <div>
                       <Container>
                         <div className={classes.header}>
@@ -285,6 +384,9 @@ const AppLayout = withStyles(styles, {
                               ref={anchor}
                             >
                               <Chip
+                                avatar={
+                                  <Avatar alt="user" src={user.avatar.url} />
+                                }
                                 className={classes.userChip}
                                 label={
                                   <>

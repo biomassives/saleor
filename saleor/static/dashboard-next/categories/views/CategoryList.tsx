@@ -1,14 +1,18 @@
 import DialogContentText from "@material-ui/core/DialogContentText";
 import IconButton from "@material-ui/core/IconButton";
 import DeleteIcon from "@material-ui/icons/Delete";
-import * as React from "react";
+import React from "react";
 
-import ActionDialog from "../../components/ActionDialog";
-import useBulkActions from "../../hooks/useBulkActions";
-import useNavigator from "../../hooks/useNavigator";
-import usePaginator, { createPaginationState } from "../../hooks/usePaginator";
-import i18n from "../../i18n";
-import { getMutationState, maybe } from "../../misc";
+import ActionDialog from "@saleor/components/ActionDialog";
+import useBulkActions from "@saleor/hooks/useBulkActions";
+import useListSettings from "@saleor/hooks/useListSettings";
+import useNavigator from "@saleor/hooks/useNavigator";
+import usePaginator, {
+  createPaginationState
+} from "@saleor/hooks/usePaginator";
+import i18n from "@saleor/i18n";
+import { getMutationState, maybe } from "@saleor/misc";
+import { ListViews } from "@saleor/types";
 import { CategoryListPage } from "../components/CategoryListPage/CategoryListPage";
 import { TypedCategoryBulkDeleteMutation } from "../mutations";
 import { TypedRootCategoriesQuery } from "../queries";
@@ -24,18 +28,18 @@ interface CategoryListProps {
   params: CategoryListUrlQueryParams;
 }
 
-const PAGINATE_BY = 20;
-
 export const CategoryList: React.StatelessComponent<CategoryListProps> = ({
   params
 }) => {
   const navigate = useNavigator();
   const paginate = usePaginator();
-  const { isSelected, listElements, toggle, reset } = useBulkActions(
+  const { isSelected, listElements, toggle, toggleAll, reset } = useBulkActions(
     params.ids
   );
-
-  const paginationState = createPaginationState(PAGINATE_BY, params);
+  const { updateListSettings, settings } = useListSettings(
+    ListViews.CATEGORY_LIST
+  );
+  const paginationState = createPaginationState(settings.rowNumber, params);
   return (
     <TypedRootCategoriesQuery displayLoader variables={paginationState}>
       {({ data, loading, refetch }) => {
@@ -72,15 +76,18 @@ export const CategoryList: React.StatelessComponent<CategoryListProps> = ({
                       () => data.categories.edges.map(edge => edge.node),
                       []
                     )}
+                    settings={settings}
                     onAdd={() => navigate(categoryAddUrl())}
                     onRowClick={id => () => navigate(categoryUrl(id))}
                     disabled={loading}
                     onNextPage={loadNextPage}
                     onPreviousPage={loadPreviousPage}
+                    onUpdateListSettings={updateListSettings}
                     pageInfo={pageInfo}
                     isChecked={isSelected}
                     selected={listElements.length}
                     toggle={toggle}
+                    toggleAll={toggleAll}
                     toolbar={
                       <IconButton
                         color="primary"
@@ -133,6 +140,11 @@ export const CategoryList: React.StatelessComponent<CategoryListProps> = ({
                         )
                       }}
                     />
+                    <DialogContentText>
+                      {i18n.t(
+                        "Remember that this will also remove all products assigned to this category."
+                      )}
+                    </DialogContentText>
                   </ActionDialog>
                 </>
               );

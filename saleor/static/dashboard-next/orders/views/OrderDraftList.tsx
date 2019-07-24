@@ -1,15 +1,19 @@
 import DialogContentText from "@material-ui/core/DialogContentText";
 import IconButton from "@material-ui/core/IconButton";
 import DeleteIcon from "@material-ui/icons/Delete";
-import * as React from "react";
+import React from "react";
 
-import ActionDialog from "../../components/ActionDialog";
-import useBulkActions from "../../hooks/useBulkActions";
-import useNavigator from "../../hooks/useNavigator";
-import useNotifier from "../../hooks/useNotifier";
-import usePaginator, { createPaginationState } from "../../hooks/usePaginator";
-import i18n from "../../i18n";
-import { getMutationState, maybe } from "../../misc";
+import ActionDialog from "@saleor/components/ActionDialog";
+import useBulkActions from "@saleor/hooks/useBulkActions";
+import useListSettings from "@saleor/hooks/useListSettings";
+import useNavigator from "@saleor/hooks/useNavigator";
+import useNotifier from "@saleor/hooks/useNotifier";
+import usePaginator, {
+  createPaginationState
+} from "@saleor/hooks/usePaginator";
+import i18n from "@saleor/i18n";
+import { getMutationState, maybe } from "@saleor/misc";
+import { ListViews } from "@saleor/types";
 import OrderDraftListPage from "../components/OrderDraftListPage";
 import {
   TypedOrderDraftBulkCancelMutation,
@@ -28,16 +32,17 @@ interface OrderDraftListProps {
   params: OrderDraftListUrlQueryParams;
 }
 
-const PAGINATE_BY = 20;
-
 export const OrderDraftList: React.StatelessComponent<OrderDraftListProps> = ({
   params
 }) => {
   const navigate = useNavigator();
   const notify = useNotifier();
   const paginate = usePaginator();
-  const { isSelected, listElements, reset, toggle } = useBulkActions(
+  const { isSelected, listElements, reset, toggle, toggleAll } = useBulkActions(
     params.ids
+  );
+  const { updateListSettings, settings } = useListSettings(
+    ListViews.DRAFT_LIST
   );
 
   const closeModal = () =>
@@ -56,7 +61,7 @@ export const OrderDraftList: React.StatelessComponent<OrderDraftListProps> = ({
     navigate(orderUrl(data.draftOrderCreate.order.id));
   };
 
-  const paginationState = createPaginationState(PAGINATE_BY, params);
+  const paginationState = createPaginationState(settings.rowNumber, params);
 
   return (
     <TypedOrderDraftCreateMutation onCompleted={handleCreateOrderCreateSuccess}>
@@ -105,6 +110,7 @@ export const OrderDraftList: React.StatelessComponent<OrderDraftListProps> = ({
                     <>
                       <OrderDraftListPage
                         disabled={loading}
+                        settings={settings}
                         orders={maybe(() =>
                           data.draftOrders.edges.map(edge => edge.node)
                         )}
@@ -112,10 +118,12 @@ export const OrderDraftList: React.StatelessComponent<OrderDraftListProps> = ({
                         onAdd={createOrder}
                         onNextPage={loadNextPage}
                         onPreviousPage={loadPreviousPage}
+                        onUpdateListSettings={updateListSettings}
                         onRowClick={id => () => navigate(orderUrl(id))}
                         isChecked={isSelected}
                         selected={listElements.length}
                         toggle={toggle}
+                        toggleAll={toggleAll}
                         toolbar={
                           <IconButton
                             color="primary"

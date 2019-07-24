@@ -1,22 +1,26 @@
 import logging
-from datetime import date
 
 from django.conf import settings
 from django.contrib.sites.models import Site
+from django.core.exceptions import MiddlewareNotUsed
+from django.utils import timezone
 from django.utils.functional import SimpleLazyObject
 from django.utils.translation import get_language
 from django_countries.fields import Country
 
-from ..discount.models import Sale
+from ..discount.utils import fetch_discounts
 from . import analytics
+from .extensions.manager import get_extensions_manager
 from .utils import get_client_ip, get_country_by_ip, get_currency_for_country
-from .utils.taxes import get_taxes_for_country
 
 logger = logging.getLogger(__name__)
 
 
 def google_analytics(get_response):
     """Report a page view to Google Analytics."""
+
+    if not settings.GOOGLE_ANALYTICS_TRACKING_ID:
+        raise MiddlewareNotUsed()
 
     def middleware(request):
         client_id = analytics.get_client_id(request)
@@ -38,10 +42,7 @@ def discounts(get_response):
     """Assign active discounts to `request.discounts`."""
 
     def middleware(request):
-        discounts = Sale.objects.active(date.today()).prefetch_related(
-            "products", "categories", "collections"
-        )
-        request.discounts = discounts
+        request.discounts = SimpleLazyObject(lambda: fetch_discounts(timezone.now()))
         return get_response(request)
 
     return middleware
@@ -83,9 +84,12 @@ def site(get_response):
     the cache. Using this middleware solves this problem.
     """
 
-    def middleware(request):
+    def _get_site():
         Site.objects.clear_cache()
-        request.site = Site.objects.get_current()
+        return Site.objects.get_current()
+
+    def middleware(request):
+        request.site = SimpleLazyObject(_get_site)
         return get_response(request)
 
     return middleware
@@ -96,11 +100,28 @@ def taxes(get_response):
 
     def middleware(request):
         if settings.VATLAYER_ACCESS_KEY:
+            # FIXME this should be disabled after we will introduce plugin architecure.
+            # For now, a lot of templates use tax_rate function.
+            from .taxes.vatlayer import get_taxes_for_country
+
             request.taxes = SimpleLazyObject(
                 lambda: get_taxes_for_country(request.country)
             )
         else:
             request.taxes = None
+        return get_response(request)
+
+    return middleware
+
+
+def extensions(get_response):
+    """Assign extensions manager"""
+
+    def _get_manager():
+        return get_extensions_manager()
+
+    def middleware(request):
+        request.extensions = SimpleLazyObject(_get_manager)
         return get_response(request)
 
     return middleware

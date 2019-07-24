@@ -1,6 +1,5 @@
 import Button from "@material-ui/core/Button";
 import Card from "@material-ui/core/Card";
-import Checkbox from "@material-ui/core/Checkbox";
 import IconButton from "@material-ui/core/IconButton";
 import {
   createStyles,
@@ -14,16 +13,17 @@ import TableCell from "@material-ui/core/TableCell";
 import TableFooter from "@material-ui/core/TableFooter";
 import TableRow from "@material-ui/core/TableRow";
 import DeleteIcon from "@material-ui/icons/Delete";
-import * as React from "react";
+import React from "react";
 
-import CardTitle from "../../../components/CardTitle";
-import Skeleton from "../../../components/Skeleton";
-import TableHead from "../../../components/TableHead";
-import TablePagination from "../../../components/TablePagination";
-import i18n from "../../../i18n";
-import { maybe, renderCollection } from "../../../misc";
-import { ICONBUTTON_SIZE } from "../../../theme";
-import { ListActions, ListProps } from "../../../types";
+import CardTitle from "@saleor/components/CardTitle";
+import Checkbox from "@saleor/components/Checkbox";
+import Skeleton from "@saleor/components/Skeleton";
+import TableHead from "@saleor/components/TableHead";
+import TablePagination from "@saleor/components/TablePagination";
+import i18n from "@saleor/i18n";
+import { maybe, renderCollection } from "@saleor/misc";
+import { ICONBUTTON_SIZE } from "@saleor/theme";
+import { ListActions, ListProps } from "@saleor/types";
 import { ShippingZoneFragment } from "../../types/ShippingZoneFragment";
 
 export interface ShippingZonesListProps extends ListProps, ListActions {
@@ -54,16 +54,19 @@ const ShippingZonesList = withStyles(styles, { name: "ShippingZonesList" })(
   ({
     classes,
     disabled,
+    settings,
     onAdd,
     onNextPage,
     onPreviousPage,
     onRemove,
+    onUpdateListSettings,
     onRowClick,
     pageInfo,
     shippingZones,
     isChecked,
     selected,
     toggle,
+    toggleAll,
     toolbar
   }: ShippingZonesListProps & WithStyles<typeof styles>) => (
     <Card>
@@ -79,24 +82,28 @@ const ShippingZonesList = withStyles(styles, { name: "ShippingZonesList" })(
         }
       />
       <Table>
-        <TableHead selected={selected} toolbar={toolbar}>
-          <TableRow>
-            <TableCell />
-            <TableCell className={classes.colName}>
-              {i18n.t("Name", { context: "object" })}
-            </TableCell>
-            <TableCell className={classes.colCountries}>
-              {i18n.t("Countries", { context: "object" })}
-            </TableCell>
-            <TableCell />
-          </TableRow>
+        <TableHead
+          selected={selected}
+          disabled={disabled}
+          items={shippingZones}
+          toggleAll={toggleAll}
+          toolbar={toolbar}
+        >
+          <TableCell className={classes.colName}>
+            {i18n.t("Name", { context: "object" })}
+          </TableCell>
+          <TableCell className={classes.colCountries}>
+            {i18n.t("Countries", { context: "object" })}
+          </TableCell>
         </TableHead>
         <TableFooter>
           <TableRow>
             <TablePagination
               colSpan={4}
+              settings={settings}
               hasNextPage={pageInfo && !disabled ? pageInfo.hasNextPage : false}
               onNextPage={onNextPage}
+              onUpdateListSettings={onUpdateListSettings}
               hasPreviousPage={
                 pageInfo && !disabled ? pageInfo.hasPreviousPage : false
               }
@@ -122,13 +129,9 @@ const ShippingZonesList = withStyles(styles, { name: "ShippingZonesList" })(
                 >
                   <TableCell padding="checkbox">
                     <Checkbox
-                      color="primary"
                       checked={isSelected}
                       disabled={disabled}
-                      onClick={event => {
-                        toggle(shippingZone.id);
-                        event.stopPropagation();
-                      }}
+                      onChange={() => toggle(shippingZone.id)}
                     />
                   </TableCell>
                   <TableCell className={classes.colName}>

@@ -7,14 +7,16 @@ import {
   WithStyles
 } from "@material-ui/core/styles";
 import Typography from "@material-ui/core/Typography";
-import * as React from "react";
+import React from "react";
 
-import CardSpacer from "../../../components/CardSpacer";
-import CardTitle from "../../../components/CardTitle";
-import { FormSpacer } from "../../../components/FormSpacer";
-import MultiAutocompleteSelectField from "../../../components/MultiAutocompleteSelectField";
-import SingleAutocompleteSelectField from "../../../components/SingleAutocompleteSelectField";
-import Skeleton from "../../../components/Skeleton";
+import CardSpacer from "@saleor/components/CardSpacer";
+import CardTitle from "@saleor/components/CardTitle";
+import Chip from "@saleor/components/Chip";
+import { FormSpacer } from "@saleor/components/FormSpacer";
+import MultiAutocompleteSelectField from "@saleor/components/MultiAutocompleteSelectField";
+import SingleAutocompleteSelectField from "@saleor/components/SingleAutocompleteSelectField";
+import Skeleton from "@saleor/components/Skeleton";
+import { ChangeEvent } from "@saleor/hooks/useForm";
 import i18n from "../../../i18n";
 import { maybe } from "../../../misc";
 import { ProductCreateData_productTypes_edges_node_productAttributes } from "../../types/ProductCreateData";
@@ -50,27 +52,29 @@ const styles = (theme: Theme) =>
     }
   });
 
+interface ProductOrganizationFormData {
+  attributes: Array<{
+    slug: string;
+    value: string;
+  }>;
+  category: ChoiceType;
+  collections: ChoiceType[];
+  productType: {
+    label: string;
+    value: {
+      hasVariants: boolean;
+      id: string;
+      name: string;
+      productAttributes: ProductCreateData_productTypes_edges_node_productAttributes[];
+    };
+  };
+}
+
 interface ProductOrganizationProps extends WithStyles<typeof styles> {
   canChangeType: boolean;
   categories?: Array<{ value: string; label: string }>;
   collections?: Array<{ value: string; label: string }>;
-  data: {
-    attributes: Array<{
-      slug: string;
-      value: string;
-    }>;
-    category: ChoiceType;
-    collections: ChoiceType[];
-    productType: {
-      label: string;
-      value: {
-        hasVariants: boolean;
-        id: string;
-        name: string;
-        productAttributes: ProductCreateData_productTypes_edges_node_productAttributes[];
-      };
-    };
-  };
+  data: ProductOrganizationFormData;
   disabled: boolean;
   errors: { [key: string]: string };
   product?: {
@@ -82,7 +86,8 @@ interface ProductOrganizationProps extends WithStyles<typeof styles> {
   productTypes?: ProductType[];
   fetchCategories: (query: string) => void;
   fetchCollections: (query: string) => void;
-  onChange: (event: React.ChangeEvent<any>, cb?: () => void) => void;
+  onChange: (event: ChangeEvent<any>) => void;
+  onSet: (data: Partial<ProductOrganizationFormData>) => void;
 }
 
 const ProductOrganization = withStyles(styles, { name: "ProductOrganization" })(
@@ -98,7 +103,8 @@ const ProductOrganization = withStyles(styles, { name: "ProductOrganization" })(
     fetchCollections,
     product,
     productTypes,
-    onChange
+    onChange,
+    onSet
   }: ProductOrganizationProps) => {
     const unrolledAttributes = maybe(
       () => data.productType.value.productAttributes,
@@ -140,35 +146,32 @@ const ProductOrganization = withStyles(styles, { name: "ProductOrganization" })(
     const getAttributeValues = (slug: string) => {
       const match = unrolledAttributes.find(a => a.slug === slug);
       if (match) {
-        return match.values;
+        return match.values.map(v => ({
+          label: v.name,
+          value: v.slug
+        }));
       }
 
       return [];
     };
     const handleProductTypeSelect = (
-      event: React.ChangeEvent<{
-        name: string;
-        value: {
+      event: ChangeEvent<
+        string,
+        {
           label: string;
           value: ProductType;
-        };
-      }>
+        }
+      >
     ) => {
-      onChange(event, () =>
-        onChange({
-          ...event,
-          target: {
-            ...event.target,
-            name: "attributes",
-            value: event.target.value.value.productAttributes.map(
-              attribute => ({
-                slug: attribute.slug,
-                value: ""
-              })
-            )
-          }
-        })
-      );
+      onSet({
+        attributes: event.target.value.value.productAttributes.map(
+          attribute => ({
+            slug: attribute.slug,
+            value: ""
+          })
+        ),
+        productType: event.target.value
+      });
     };
     const handleAttributeValueSelect = (
       event: React.ChangeEvent<{
@@ -214,7 +217,6 @@ const ProductOrganization = withStyles(styles, { name: "ProductOrganization" })(
               }
               value={data.productType}
               onChange={handleProductTypeSelect}
-
             />
           ) : (
             <>
@@ -260,10 +262,7 @@ const ProductOrganization = withStyles(styles, { name: "ProductOrganization" })(
                     label={getAttributeName(item.slug)}
                     onChange={handleAttributeValueSelect}
                     value={getAttributeValue(item.slug)}
-                    choices={getAttributeValues(item.slug).map(v => ({
-                      label: v.name,
-                      value: v.slug
-                    }))}
+                    choices={getAttributeValues(item.slug)}
                     custom
                   />
                   <FormSpacer />
@@ -294,7 +293,22 @@ const ProductOrganization = withStyles(styles, { name: "ProductOrganization" })(
             value={data.collections}
             onChange={onChange}
             fetchChoices={fetchCollections}
-          />
+          >
+            {({ deleteItem, items }) => (
+              <>
+                <FormSpacer />
+                <div>
+                  {items.map(item => (
+                    <Chip
+                      key={item.value}
+                      label={item.label}
+                      onClose={() => deleteItem(item)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </MultiAutocompleteSelectField>
         </CardContent>
       </Card>
     );

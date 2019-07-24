@@ -1,11 +1,11 @@
 import Button from "@material-ui/core/Button";
 import AddIcon from "@material-ui/icons/Add";
-import * as React from "react";
+import React from "react";
 
-import Container from "../../../components/Container";
-import PageHeader from "../../../components/PageHeader";
-import i18n from "../../../i18n";
-import { ListActions, PageListProps } from "../../../types";
+import Container from "@saleor/components/Container";
+import PageHeader from "@saleor/components/PageHeader";
+import i18n from "@saleor/i18n";
+import { ListActions, PageListProps } from "@saleor/types";
 import { VoucherList_vouchers_edges_node } from "../../types/VoucherList";
 import VoucherList from "../VoucherList";
 
@@ -17,15 +17,18 @@ export interface VoucherListPageProps extends PageListProps, ListActions {
 const VoucherListPage: React.StatelessComponent<VoucherListPageProps> = ({
   defaultCurrency,
   disabled,
+  settings,
   onAdd,
   onNextPage,
   onPreviousPage,
+  onUpdateListSettings,
   onRowClick,
   pageInfo,
   vouchers,
   isChecked,
   selected,
   toggle,
+  toggleAll,
   toolbar
 }) => (
   <Container>
@@ -37,15 +40,18 @@ const VoucherListPage: React.StatelessComponent<VoucherListPageProps> = ({
     </PageHeader>
     <VoucherList
       defaultCurrency={defaultCurrency}
+      settings={settings}
       disabled={disabled}
       onNextPage={onNextPage}
       onPreviousPage={onPreviousPage}
+      onUpdateListSettings={onUpdateListSettings}
       onRowClick={onRowClick}
       pageInfo={pageInfo}
       vouchers={vouchers}
       isChecked={isChecked}
       selected={selected}
       toggle={toggle}
+      toggleAll={toggleAll}
       toolbar={toolbar}
     />
   </Container>

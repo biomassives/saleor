@@ -5,8 +5,8 @@ import {
   WithStyles
 } from "@material-ui/core/styles";
 import Typography from "@material-ui/core/Typography";
-import * as classNames from "classnames";
-import * as React from "react";
+import classNames from "classnames";
+import React from "react";
 
 const styles = (theme: Theme) =>
   createStyles({
@@ -14,7 +14,7 @@ const styles = (theme: Theme) =>
     root: {
       "&$active": {
         borderBottomColor: theme.palette.primary.main,
-        color: theme.typography.body1.color
+        color: theme.typography.body2.color
       },
       "&:focus": {
         color: theme.palette.primary.main

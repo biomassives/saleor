@@ -4,7 +4,123 @@ All notable, unreleased changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-...
+- Fix product type taxes select - #4453 by @benekex2
+- Fix form reloading - #4467 by @dominik-zeglen
+- Fix time zone based tests - #4468 by @fowczarek
+- Move Django Debug Toolbar requirement to the "dev" one (also downgrade it 2.0 -> 1.11, see PR) - #4454 by @derenio
+- Add voucher once per customer - #4442 by @fowczarek
+- Fix voucher limit value when checkbox unchecked - #4456 by @benekex2
+- New menu design - #4476 by @benekex2
+- Mutation for changing logged user first and last name - #4489 by @fowczarek
+- Add mutation for deleting account - #4494 by @fowczarek
+- New translations:
+  - Greek
+- Fix searches and pickers - #4487 by @dominik-zeglen
+- Fix dashboard menu styles - #4491 by @benekex2
+- Do not allow random ids to appear in snapshots - #4495 by @dominik-zeglen
+- Order is no longer created when the payment was unsuccessful in the API - #4500 by @NyanKiyoshi
+- Fix navigation rwd - #4511 by @benekex2
+- Create general abstraction for object metadata - #4447 by @salwator
+- Contrast improvements - #4508 by @benekex2
+- Allow selecting the number of rows displayed in dashboard's list views - #4414 by @benekex2
+- Changed license for artwork to CC-BY 4.0
+
+## 2.8.0
+
+### Core
+
+- Avatax backend support - #4310 by @korycins
+- Add ability to store used payment sources in gateways (first implemented in Braintree) - #4195 by @salwator
+- Add ability to specify a minimal quantity of checkout items for a voucher - #4427 by @fowczarek
+- Change the type of start and end date fields from Date to DateTime - #4293 by @fowczarek
+- Revert the custom dynamic middlewares - #4452 by @NyanKiyoshi
+
+### Dashboard 2.0
+
+- UX improvements in Vouchers section - #4362 by @benekex2
+- Add company address configuration - #4432 by @benekex2
+- Require name when saving a custom list filter - #4269 by @benekex2
+- Use `esModuleInterop` flag in `tsconfig.json` to simplify imports - #4372 by @dominik-zeglen
+- Use hooks instead of a class component in forms - #4374 by @dominik-zeglen
+- Drop CSRF token header from API client - #4357 by @dominik-zeglen
+- Fix various bugs in the product section - #4429 by @dominik-zeglen
+
+### Other notable changes
+
+- Fix error when creating a checkout with voucher code - #4292 by @NyanKiyoshi
+- Fix error when users enter an invalid phone number in an address - #4404 by @NyanKiyoshi
+- Fix error when adding a note to an anonymous order - #4319 by @NyanKiyoshi
+- Fix gift card duplication error in the `populatedb` script - #4336 by @fowczarek
+- Fix vouchers apply once per order - #4339 by @fowczarek
+- Fix discount tests failing at random - #4401 by @korycins
+- Add `SPECIFIC_PRODUCT` type to `VoucherType` - #4344 by @fowczarek
+- New translations:
+  - Icelandic
+- Refactored the backend side of `checkoutCreate` to improve performances and prevent side effects over the user's checkout if the checkout creation was to fail. - #4367 by @NyanKiyoshi
+- Refactored the logic of cleaning the checkout shipping method over the API, so users do not lose the shipping method when updating their checkout. If the shipping method becomes invalid, it will be replaced by the cheapest available. - #4367 by @NyanKiyoshi & @szewczykmira
+- Refactored process of getting available shipping methods to make it easier to understand and prevent human-made errors. - #4367 by @NyanKiyoshi
+
+## 2.7.0
+
+### API
+
+- Create order only when payment is successful - #4154 by @NyanKiyoshi
+- Order Events containing order lines or fulfillment lines now return the line object in the GraphQL API - #4114 by @NyanKiyoshi
+- GraphQL now prints exceptions to stderr as well as returning them or not - #4148 by @NyanKiyoshi
+- Refactored API resolvers to static methods with root typing - #4155 by @NyanKiyoshi
+- Add phone validation in the GraphQL API to handle the library upgrade - #4156 by @NyanKiyoshi
+
+### Core
+
+- Add basic Gift Cards support in the backend - #4025 by @fowczarek
+- Add the ability to sort products within a collection - #4123 by @NyanKiyoshi
+- Implement customer events - #4094 by @NyanKiyoshi
+- Merge "authorize" and "capture" operations - #4098 by @korycins, @NyanKiyoshi
+- Separate the Django middlewares from the GraphQL API middlewares - #4102 by @NyanKiyoshi, #4186 by @cmiacz
+
+### Dashboard 2.0
+
+- Add navigation section - #4012 by @dominik-zeglen
+- Add filtering on product list - #4193 by @dominik-zeglen
+- Add filtering on orders list - #4237 by @dominik-zeglen
+- Change input style and improve Storybook stories - #4115 by @dominik-zeglen
+- Migrate deprecated fields in Dashboard 2.0 - #4121 by @benekex2
+- Add multiple select checkbox - #4133, #4146 by @benekex2
+- Rename menu items in Dashboard 2.0 - #4172 by @benekex2
+- Category delete modal improvements - #4171 by @benekex2
+- Close modals on click outside - #4236 - by @benekex2
+- Use date localize hook in translations - #4202 by @dominik-zeglen
+- Unify search API - #4200 by @dominik-zeglen
+- Default default PAGINATE_BY - #4238 by @dominik-zeglen
+- Create generic filtering interface - #4221 by @dominik-zeglen
+- Add default state to rich text editor = #4281 by @dominik-zeglen
+- Fix translation discard button - #4109 by @benekex2
+- Fix draftail options and icons - #4132 by @benekex2
+- Fix typos and messages in Dashboard 2.0 - #4168 by @benekex2
+- Fix view all orders button - #4173 by @benekex2
+- Fix visibility card view - #4198 by @benekex2
+- Fix query refetch after selecting an object in list - #4272 by @dominik-zeglen
+- Fix image selection in variants - #4270 by @benekex2
+- Fix collection search - #4267 by @dominik-zeglen
+- Fix quantity height in draft order edit - #4273 by @benekex2
+- Fix checkbox clickable area size - #4280 by @dominik-zeglen
+- Fix breaking object selection in menu section - #4282 by @dominik-zeglen
+- Reset selected items when tab switch - #4268 by @benekex2
+
+### Other notable changes
+
+- Add support for Google Cloud Storage - #4127 by @chetabahana
+- Adding a nonexistent variant to checkout no longer crashes - #4166 by @NyanKiyoshi
+- Disable storage of Celery results - #4169 by @NyanKiyoshi
+- Disable polling in Playground - #4188 by @maarcingebala
+- Cleanup code for updated function names and unused argument - #4090 by @jxltom
+- Users can now add multiple "Add to Cart" forms in a single page - #4165 by @NyanKiyoshi
+- Fix incorrect argument in `get_client_token` in Braintree integration - #4182 by @maarcingebala
+- Fix resolving attribute values when transforming them to HStore - #4161 by @maarcingebala
+- Fix wrong calculation of subtotal in cart page - #4145 by @korycins
+- Fix margin calculations when product/variant price is set to zero - #4170 by @MahmoudRizk
+- Fix applying discounts in checkout's subtotal calculation in API - #4192 by @maarcingebala
+- Fix GATEWAYS_ENUM to always contain all implemented payment gateways - #4108 by @koradon
 
 ## 2.6.0
 

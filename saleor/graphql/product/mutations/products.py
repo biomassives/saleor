@@ -1,9 +1,13 @@
+from typing import List, Tuple
+
 import graphene
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.template.defaultfilters import slugify
 from graphene.types import InputObjectType
 
+from ....core.taxes import interface as tax_interface
+from ....core.taxes.vatlayer import interface as vatlayer_interface
 from ....product import models
 from ....product.tasks import update_variants_names
 from ....product.thumbnails import (
@@ -13,11 +17,28 @@ from ....product.thumbnails import (
 )
 from ....product.utils.attributes import get_name_from_attributes
 from ...core.enums import TaxRateType
-from ...core.mutations import BaseMutation, ModelDeleteMutation, ModelMutation
+from ...core.mutations import (
+    BaseMutation,
+    ClearMetaBaseMutation,
+    ModelDeleteMutation,
+    ModelMutation,
+    UpdateMetaBaseMutation,
+)
 from ...core.scalars import Decimal, WeightScalar
 from ...core.types import SeoInput, Upload
-from ...core.utils import clean_seo_fields, validate_image_file
-from ..types import Category, Collection, Product, ProductImage, ProductVariant
+from ...core.utils import (
+    clean_seo_fields,
+    from_global_id_strict_type,
+    validate_image_file,
+)
+from ..types import (
+    Category,
+    Collection,
+    MoveProductInput,
+    Product,
+    ProductImage,
+    ProductVariant,
+)
 from ..utils import attributes_to_hstore
 
 
@@ -89,12 +110,6 @@ class CategoryUpdate(CategoryCreate):
         description = "Updates a category."
         model = models.Category
         permissions = ("product.manage_products",)
-
-    @classmethod
-    def save(cls, info, instance, cleaned_input):
-        if cleaned_input.get("background_image"):
-            create_category_background_image_thumbnails.delay(instance.pk)
-        instance.save()
 
 
 class CategoryDelete(ModelDeleteMutation):
@@ -191,6 +206,76 @@ class CollectionDelete(ModelDeleteMutation):
         permissions = ("product.manage_products",)
 
 
+class CollectionReorderProducts(BaseMutation):
+    collection = graphene.Field(
+        Collection, description="Collection from which products are reordered."
+    )
+
+    class Meta:
+        description = "Reorder the products of a collection"
+        permissions = ("product.manage_products",)
+
+    class Arguments:
+        collection_id = graphene.Argument(
+            graphene.ID, required=True, description="ID of a collection."
+        )
+        moves = graphene.List(
+            MoveProductInput,
+            required=True,
+            description="The collection products position operations.",
+        )
+
+    @classmethod
+    def get_operations(
+        cls, info, collection_id: int, moves: List[MoveProductInput]
+    ) -> List[Tuple[models.CollectionProduct, int]]:
+        operations = []
+        current_rel_pos = None
+
+        for move_info in moves:
+            product_id = from_global_id_strict_type(
+                info, move_info.product_id, only_type=Product, field="moves"
+            )
+
+            try:
+                node = models.CollectionProduct.objects.get(
+                    product_id=product_id, collection_id=collection_id
+                )
+            except models.CollectionProduct.DoesNotExist:
+                raise ValidationError(
+                    {"moves": "Couldn't resolve to a product: %s" % product_id}
+                )
+
+            if current_rel_pos is None:
+                # This case happens when products created using a bulk_creation
+                # e.g., bulk_create or collections.add
+                if node.sort_order is None:
+                    current_rel_pos = (
+                        node.get_max_sort_order(node.get_ordering_queryset()) or 0
+                    )
+                else:
+                    current_rel_pos = node.sort_order
+            else:
+                current_rel_pos += 1
+
+            sort_position = max(0, current_rel_pos + move_info.sort_order)
+            operations.append((node, sort_position))
+
+        return operations
+
+    @classmethod
+    def perform_mutation(cls, _root, info, collection_id, moves):
+        collection = cls.get_node_or_error(
+            info, collection_id, field="collection_id", only_type=Collection
+        )
+
+        for node, new_position in cls.get_operations(info, collection.id, moves):
+            node.sort_order = new_position
+            node.save(update_fields=["sort_order"])
+
+        return CollectionReorderProducts(collection=collection)
+
+
 class CollectionAddProducts(BaseMutation):
     collection = graphene.Field(
         Collection, description="Collection to which products will be added."
@@ -245,6 +330,70 @@ class CollectionRemoveProducts(BaseMutation):
         return CollectionRemoveProducts(collection=collection)
 
 
+class CollectionUpdateMeta(UpdateMetaBaseMutation):
+    class Meta:
+        model = models.Collection
+        description = "Update public metadata for Collection"
+        permissions = ("product.manage_products",)
+        public = True
+
+
+class CollectionClearMeta(ClearMetaBaseMutation):
+    class Meta:
+        model = models.Collection
+        description = "Clears public metadata item for Collection"
+        permissions = ("product.manage_products",)
+        public = True
+
+
+class CollectionUpdatePrivateMeta(UpdateMetaBaseMutation):
+    class Meta:
+        model = models.Collection
+        description = "Update public metadata for Collection"
+        permissions = ("product.manage_products",)
+        public = False
+
+
+class CollectionClearPrivateMeta(ClearMetaBaseMutation):
+    class Meta:
+        model = models.Collection
+        description = "Clears public metadata item for Collection"
+        permissions = ("product.manage_products",)
+        public = False
+
+
+class CategoryUpdateMeta(UpdateMetaBaseMutation):
+    class Meta:
+        model = models.Category
+        description = "Update public metadata for category"
+        permissions = ("product.manage_products",)
+        public = True
+
+
+class CategoryClearMeta(ClearMetaBaseMutation):
+    class Meta:
+        model = models.Category
+        description = "Clears public metadata item for category"
+        permissions = ("product.manage_products",)
+        public = True
+
+
+class CategoryUpdatePrivateMeta(UpdateMetaBaseMutation):
+    class Meta:
+        model = models.Category
+        description = "Update public metadata for category"
+        permissions = ("product.manage_products",)
+        public = False
+
+
+class CategoryClearPrivateMeta(ClearMetaBaseMutation):
+    class Meta:
+        model = models.Category
+        description = "Clears public metadata item for category"
+        permissions = ("product.manage_products",)
+        public = False
+
+
 class AttributeValueInput(InputObjectType):
     slug = graphene.String(required=True, description="Slug of an attribute.")
     value = graphene.String(required=True, description="Value of an attribute.")
@@ -270,8 +419,16 @@ class ProductInput(graphene.InputObjectType):
         description="Determines if product is visible to customers."
     )
     name = graphene.String(description="Product name.")
-    price = Decimal(description="Product price.")
-    tax_rate = TaxRateType(description="Tax rate.")
+    price = Decimal(
+        description="""
+        Product price. Note: this field is deprecated, use basePrice instead."""
+    )
+    base_price = Decimal(description="Product price.")
+    tax_rate = TaxRateType(
+        description="Tax rate.",
+        deprecation_reason=("taxRate is deprecated, Use taxCode"),
+    )
+    tax_code = graphene.String(description="Tax rate for enabled tax gateway")
     seo = SeoInput(description="Search engine optimization fields.")
     weight = WeightScalar(description="Weight of the Product.", required=False)
     sku = graphene.String(
@@ -322,6 +479,21 @@ class ProductCreate(ModelMutation):
         product_type = (
             instance.product_type if instance.pk else cleaned_input.get("product_type")
         )
+
+        # Try to get price from "basePrice" or "price" field. Once "price" is removed
+        # from the schema, only "basePrice" should be used here.
+        price = data.get("base_price", data.get("price"))
+        if price is not None:
+            cleaned_input["price"] = price
+
+        # FIXME  tax_rate logic should be dropped after we remove tax_rate from input
+        tax_rate = cleaned_input.pop("tax_rate", "")
+        if tax_rate:
+            vatlayer_interface.assign_tax_to_object_meta(instance, tax_rate)
+
+        tax_code = cleaned_input.pop("tax_code", "")
+        if tax_code:
+            tax_interface.assign_tax_to_object_meta(instance, tax_code)
 
         if attributes and product_type:
             qs = product_type.product_attributes.prefetch_related("values")
@@ -428,6 +600,38 @@ class ProductDelete(ModelDeleteMutation):
         permissions = ("product.manage_products",)
 
 
+class ProductUpdateMeta(UpdateMetaBaseMutation):
+    class Meta:
+        model = models.Product
+        description = "Update public metadata for product"
+        permissions = ("product.manage_products",)
+        public = True
+
+
+class ProductClearMeta(ClearMetaBaseMutation):
+    class Meta:
+        description = "Clears public metadata item for product"
+        model = models.Product
+        permissions = ("product.manage_products",)
+        public = True
+
+
+class ProductUpdatePrivateMeta(UpdateMetaBaseMutation):
+    class Meta:
+        description = "Update public metadata for product"
+        model = models.Product
+        permissions = ("product.manage_products",)
+        public = False
+
+
+class ProductClearPrivateMeta(ClearMetaBaseMutation):
+    class Meta:
+        description = "Clears public metadata item for product"
+        model = models.Product
+        permissions = ("product.manage_products",)
+        public = False
+
+
 class ProductVariantInput(graphene.InputObjectType):
     attributes = graphene.List(
         AttributeValueInput,
@@ -508,7 +712,9 @@ class ProductVariantCreate(ModelMutation):
 
     @classmethod
     def save(cls, info, instance, cleaned_input):
-        attributes = instance.product.product_type.variant_attributes.all()
+        attributes = instance.product.product_type.variant_attributes.prefetch_related(
+            "values__translations"
+        )
         instance.name = get_name_from_attributes(instance, attributes)
         instance.save()
 
@@ -540,6 +746,38 @@ class ProductVariantDelete(ModelDeleteMutation):
         permissions = ("product.manage_products",)
 
 
+class ProductVariantUpdateMeta(UpdateMetaBaseMutation):
+    class Meta:
+        model = models.ProductVariant
+        description = "Update public metadata for product variant"
+        permissions = ("product.manage_products",)
+        public = True
+
+
+class ProductVariantClearMeta(ClearMetaBaseMutation):
+    class Meta:
+        model = models.ProductVariant
+        description = "Clears public metadata item for product variant"
+        permissions = ("product.manage_products",)
+        public = True
+
+
+class ProductVariantUpdatePrivateMeta(UpdateMetaBaseMutation):
+    class Meta:
+        model = models.ProductVariant
+        description = "Update public metadata for product variant"
+        permissions = ("product.manage_products",)
+        public = False
+
+
+class ProductVariantClearPrivateMeta(ClearMetaBaseMutation):
+    class Meta:
+        model = models.ProductVariant
+        description = "Clears public metadata item for product variant"
+        permissions = ("product.manage_products",)
+        public = False
+
+
 class ProductTypeInput(graphene.InputObjectType):
     name = graphene.String(description="Name of the product type.")
     has_variants = graphene.Boolean(
@@ -567,7 +805,11 @@ class ProductTypeInput(graphene.InputObjectType):
         description="Determines if products are digital.", required=False
     )
     weight = WeightScalar(description="Weight of the ProductType items.")
-    tax_rate = TaxRateType(description="A type of goods.")
+    tax_rate = TaxRateType(
+        description="Tax rate.",
+        deprecation_reason=("taxRate is deprecated, Use taxCode"),
+    )
+    tax_code = graphene.String(description="Tax rate for enabled tax gateway")
 
 
 class ProductTypeCreate(ModelMutation):
@@ -580,6 +822,21 @@ class ProductTypeCreate(ModelMutation):
         description = "Creates a new product type."
         model = models.ProductType
         permissions = ("product.manage_products",)
+
+    @classmethod
+    def clean_input(cls, info, instance, data):
+        cleaned_input = super().clean_input(info, instance, data)
+
+        # FIXME  tax_rate logic should be dropped after we remove tax_rate from input
+        tax_rate = cleaned_input.pop("tax_rate", "")
+        if tax_rate:
+            vatlayer_interface.assign_tax_to_object_meta(instance, tax_rate)
+
+        tax_code = cleaned_input.pop("tax_code", "")
+        if tax_code:
+            tax_interface.assign_tax_to_object_meta(instance, tax_code)
+
+        return cleaned_input
 
     @classmethod
     def _save_m2m(cls, info, instance, cleaned_data):
@@ -620,6 +877,38 @@ class ProductTypeDelete(ModelDeleteMutation):
         description = "Deletes a product type."
         model = models.ProductType
         permissions = ("product.manage_products",)
+
+
+class ProductTypeUpdateMeta(UpdateMetaBaseMutation):
+    class Meta:
+        model = models.ProductType
+        description = "Update public metadata for product type"
+        permissions = ("product.manage_products",)
+        public = True
+
+
+class ProductTypeClearMeta(ClearMetaBaseMutation):
+    class Meta:
+        description = "Clears public metadata item for product type"
+        model = models.ProductType
+        permissions = ("product.manage_products",)
+        public = True
+
+
+class ProductTypeUpdatePrivateMeta(UpdateMetaBaseMutation):
+    class Meta:
+        description = "Update public metadata for product type"
+        model = models.ProductType
+        permissions = ("product.manage_products",)
+        public = False
+
+
+class ProductTypeClearPrivateMeta(ClearMetaBaseMutation):
+    class Meta:
+        description = "Clears public metadata item for product type"
+        model = models.ProductType
+        permissions = ("product.manage_products",)
+        public = False
 
 
 class ProductImageCreateInput(graphene.InputObjectType):

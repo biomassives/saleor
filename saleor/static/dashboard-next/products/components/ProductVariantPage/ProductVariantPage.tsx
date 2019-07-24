@@ -1,13 +1,13 @@
-import * as React from "react";
+import React from "react";
 
-import AppHeader from "../../../components/AppHeader";
-import CardSpacer from "../../../components/CardSpacer";
-import { ConfirmButtonTransitionState } from "../../../components/ConfirmButton/ConfirmButton";
-import Container from "../../../components/Container";
-import Form from "../../../components/Form";
-import Grid from "../../../components/Grid";
-import PageHeader from "../../../components/PageHeader";
-import SaveButtonBar from "../../../components/SaveButtonBar";
+import AppHeader from "@saleor/components/AppHeader";
+import CardSpacer from "@saleor/components/CardSpacer";
+import { ConfirmButtonTransitionState } from "@saleor/components/ConfirmButton";
+import Container from "@saleor/components/Container";
+import Form from "@saleor/components/Form";
+import Grid from "@saleor/components/Grid";
+import PageHeader from "@saleor/components/PageHeader";
+import SaveButtonBar from "@saleor/components/SaveButtonBar";
 import { maybe } from "../../../misc";
 import { UserError } from "../../../types";
 import { ProductVariant } from "../../types/ProductVariant";
@@ -70,13 +70,15 @@ const ProductVariantPage: React.StatelessComponent<ProductVariantPageProps> = ({
         <PageHeader title={header} />
         <Form
           initial={{
-            attributes:
-              variant && variant.attributes
-                ? variant.attributes.map(a => ({
-                    slug: a.attribute.slug,
-                    value: a.value.slug
-                  }))
-                : [],
+            attributes: maybe(
+              () =>
+                variant.attributes.map(a => ({
+                  name: a.attribute.name,
+                  slug: a.attribute.slug,
+                  value: a.value.slug
+                })),
+              []
+            ),
             costPrice:
               variant && variant.costPrice
                 ? variant.costPrice.amount.toString()

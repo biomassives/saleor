@@ -1,4 +1,3 @@
-import Checkbox from "@material-ui/core/Checkbox";
 import {
   createStyles,
   Theme,
@@ -10,13 +9,14 @@ import TableBody from "@material-ui/core/TableBody";
 import TableCell from "@material-ui/core/TableCell";
 import TableFooter from "@material-ui/core/TableFooter";
 import TableRow from "@material-ui/core/TableRow";
-import * as React from "react";
+import React from "react";
 
+import TableCellAvatar from "@saleor/components/TableCellAvatar";
+import i18n from "@saleor/i18n";
+import { maybe, renderCollection } from "@saleor/misc";
+import { ListActions, ListProps } from "@saleor/types";
 import { CategoryDetails_category_products_edges_node } from "../../categories/types/CategoryDetails";
-import TableCellAvatar from "../../components/TableCellAvatar";
-import i18n from "../../i18n";
-import { maybe, renderCollection } from "../../misc";
-import { ListActions, ListProps } from "../../types";
+import Checkbox from "../Checkbox";
 import Money from "../Money";
 import Skeleton from "../Skeleton";
 import StatusLabel from "../StatusLabel";
@@ -71,42 +71,50 @@ interface ProductListProps
 export const ProductList = withStyles(styles, { name: "ProductList" })(
   ({
     classes,
+    settings,
     disabled,
     isChecked,
     pageInfo,
     products,
     selected,
     toggle,
+    toggleAll,
     toolbar,
     onNextPage,
     onPreviousPage,
+    onUpdateListSettings,
     onRowClick
   }: ProductListProps) => (
     <Table>
-      <TableHead selected={selected} toolbar={toolbar}>
-        <TableRow>
-          <TableCell />
-          <TableCell />
-          <TableCell className={classes.colName}>
-            {i18n.t("Name", { context: "object" })}
-          </TableCell>
-          <TableCell className={classes.colType}>
-            {i18n.t("Type", { context: "object" })}
-          </TableCell>
-          <TableCell className={classes.colPublished}>
-            {i18n.t("Published", { context: "object" })}
-          </TableCell>
-          <TableCell className={classes.colPrice}>
-            {i18n.t("Price", { context: "object" })}
-          </TableCell>
-        </TableRow>
+      <TableHead
+        selected={selected}
+        disabled={disabled}
+        items={products}
+        toggleAll={toggleAll}
+        toolbar={toolbar}
+      >
+        <TableCell />
+        <TableCell className={classes.colName}>
+          {i18n.t("Name", { context: "object" })}
+        </TableCell>
+        <TableCell className={classes.colType}>
+          {i18n.t("Type", { context: "object" })}
+        </TableCell>
+        <TableCell className={classes.colPublished}>
+          {i18n.t("Published", { context: "object" })}
+        </TableCell>
+        <TableCell className={classes.colPrice}>
+          {i18n.t("Price", { context: "object" })}
+        </TableCell>
       </TableHead>
       <TableFooter>
         <TableRow>
           <TablePagination
             colSpan={6}
+            settings={settings}
             hasNextPage={pageInfo && !disabled ? pageInfo.hasNextPage : false}
             onNextPage={onNextPage}
+            onUpdateListSettings={onUpdateListSettings}
             hasPreviousPage={
               pageInfo && !disabled ? pageInfo.hasPreviousPage : false
             }
@@ -130,13 +138,9 @@ export const ProductList = withStyles(styles, { name: "ProductList" })(
               >
                 <TableCell padding="checkbox">
                   <Checkbox
-                    color="primary"
                     checked={isSelected}
                     disabled={disabled}
-                    onClick={event => {
-                      toggle(product.id);
-                      event.stopPropagation();
-                    }}
+                    onChange={() => toggle(product.id)}
                   />
                 </TableCell>
                 <TableCellAvatar
@@ -153,31 +157,26 @@ export const ProductList = withStyles(styles, { name: "ProductList" })(
                   )}
                 </TableCell>
                 <TableCell className={classes.colPublished}>
-                  {product &&
-                  product.availability &&
-                  product.availability.available !== undefined ? (
+                  {product && maybe(() => product.isAvailable !== undefined) ? (
                     <StatusLabel
                       label={
-                        product.availability.available
+                        product.isAvailable
                           ? i18n.t("Published", { context: "product status" })
                           : i18n.t("Not published", {
                               context: "product status"
                             })
                       }
-                      status={
-                        product.availability.available ? "success" : "error"
-                      }
+                      status={product.isAvailable ? "success" : "error"}
                     />
                   ) : (
                     <Skeleton />
                   )}
                 </TableCell>
                 <TableCell className={classes.colPrice}>
-                  {product &&
-                  product.price &&
-                  product.price.amount !== undefined &&
-                  product.price.currency !== undefined ? (
-                    <Money money={product.price} />
+                  {maybe(() => product.basePrice) &&
+                  maybe(() => product.basePrice.amount) !== undefined &&
+                  maybe(() => product.basePrice.currency) !== undefined ? (
+                    <Money money={product.basePrice} />
                   ) : (
                     <Skeleton />
                   )}

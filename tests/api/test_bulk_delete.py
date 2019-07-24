@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import graphene
 import pytest
 
@@ -77,14 +79,6 @@ def product_type_list():
     product_type_2 = ProductType.objects.create(name="Type 2")
     product_type_3 = ProductType.objects.create(name="Type 3")
     return product_type_1, product_type_2, product_type_3
-
-
-@pytest.fixture
-def product_variant_list(product):
-    product_variant_1 = ProductVariant.objects.create(product=product, sku="1")
-    product_variant_2 = ProductVariant.objects.create(product=product, sku="2")
-    product_variant_3 = ProductVariant.objects.create(product=product, sku="3")
-    return product_variant_1, product_variant_2, product_variant_3
 
 
 @pytest.fixture
@@ -234,7 +228,16 @@ def test_delete_collections(
     ).exists()
 
 
-def test_delete_customers(staff_api_client, user_list, permission_manage_users):
+@patch(
+    "saleor.graphql.account.utils.account_events.staff_user_deleted_a_customer_event"
+)
+def test_delete_customers(
+    mocked_deletion_event,
+    staff_api_client,
+    staff_user,
+    user_list,
+    permission_manage_users,
+):
     user_1, user_2, *users = user_list
 
     query = """
@@ -254,10 +257,24 @@ def test_delete_customers(staff_api_client, user_list, permission_manage_users):
     content = get_graphql_content(response)
 
     assert content["data"]["customerBulkDelete"]["count"] == 2
+
+    deleted_customers = [user_1, user_2]
+    saved_customers = users
+
+    # Ensure given customers were properly deleted and others properly saved
+    # and any related event was properly triggered
+
+    # Ensure the customers were properly deleted and others were preserved
     assert not User.objects.filter(
-        id__in=[user.id for user in [user_1, user_2]]
+        id__in=[user.id for user in deleted_customers]
     ).exists()
-    assert User.objects.filter(id__in=[user.id for user in users]).count() == len(users)
+    assert User.objects.filter(
+        id__in=[user.id for user in saved_customers]
+    ).count() == len(saved_customers)
+
+    mocked_deletion_event.assert_called_once_with(
+        staff_user=staff_user, deleted_count=len(deleted_customers)
+    )
 
 
 def test_delete_draft_orders(staff_api_client, order_list, permission_manage_orders):

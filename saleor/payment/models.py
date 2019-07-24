@@ -9,9 +9,15 @@ from django.db import models
 from prices import Money
 
 from ..checkout.models import Checkout
-from ..core.utils.taxes import zero_money
+from ..core.taxes import zero_money
 from ..order.models import Order
-from . import ChargeStatus, CustomPaymentChoices, TransactionError, TransactionKind
+from . import (
+    ChargeStatus,
+    CustomPaymentChoices,
+    TransactionError,
+    TransactionKind,
+    get_payment_gateway,
+)
 
 
 class Payment(models.Model):
@@ -154,11 +160,14 @@ class Payment(models.Model):
         return self.is_active and self.not_charged
 
     def can_capture(self):
-        return self.is_active and self.not_charged and self.is_authorized
+        if not (self.is_active and self.not_charged):
+            return False
 
-    def can_charge(self):
-        not_fully_charged = self.charge_status == ChargeStatus.PARTIALLY_CHARGED
-        return self.is_active and (self.not_charged or not_fully_charged)
+        _, gateway_config = get_payment_gateway(self.gateway)
+        if gateway_config.auto_capture:
+            return self.is_authorized
+
+        return True
 
     def can_void(self):
         return self.is_active and self.not_charged and self.is_authorized
@@ -201,6 +210,7 @@ class Transaction(models.Model):
         max_length=256,
         null=True,
     )
+    customer_id = models.CharField(max_length=256, null=True)
     gateway_response = JSONField(encoder=DjangoJSONEncoder)
 
     class Meta:

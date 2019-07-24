@@ -1,5 +1,6 @@
 import ast
 import os.path
+import warnings
 
 import dj_database_url
 import dj_email_url
@@ -66,6 +67,7 @@ LANGUAGES = [
     ("cs", _("Czech")),
     ("da", _("Danish")),
     ("de", _("German")),
+    ("el", _("Greek")),
     ("en", _("English")),
     ("es", _("Spanish")),
     ("es-co", _("Colombian Spanish")),
@@ -76,6 +78,7 @@ LANGUAGES = [
     ("hu", _("Hungarian")),
     ("hy", _("Armenian")),
     ("id", _("Indonesian")),
+    ("is", _("Icelandic")),
     ("it", _("Italian")),
     ("ja", _("Japanese")),
     ("ko", _("Korean")),
@@ -209,6 +212,7 @@ MIDDLEWARE = [
     "saleor.core.middleware.currency",
     "saleor.core.middleware.site",
     "saleor.core.middleware.taxes",
+    "saleor.core.middleware.extensions",
     "social_django.middleware.SocialAuthExceptionMiddleware",
     "impersonate.middleware.ImpersonateMiddleware",
     "saleor.graphql.middleware.jwt_middleware",
@@ -230,6 +234,7 @@ INSTALLED_APPS = [
     # Local apps
     "saleor.account",
     "saleor.discount",
+    "saleor.giftcard",
     "saleor.product",
     "saleor.checkout",
     "saleor.core",
@@ -258,7 +263,6 @@ INSTALLED_APPS = [
     "social_django",
     "django_countries",
     "django_filters",
-    "django_celery_results",
     "impersonate",
     "phonenumber_field",
     "captcha",
@@ -267,23 +271,26 @@ INSTALLED_APPS = [
 
 ENABLE_DEBUG_TOOLBAR = get_bool_from_env("ENABLE_DEBUG_TOOLBAR", False)
 if ENABLE_DEBUG_TOOLBAR:
-    MIDDLEWARE.append("debug_toolbar.middleware.DebugToolbarMiddleware")
-    INSTALLED_APPS.append("debug_toolbar")
+    # Ensure the debug toolbar is actually installed before adding it
+    try:
+        __import__("debug_toolbar")
+    except ImportError as exc:
+        msg = (
+            f"{exc} -- Install the missing dependencies by "
+            f"running `pip install -r requirements_dev.txt`"
+        )
+        warnings.warn(msg)
+    else:
+        MIDDLEWARE.append("debug_toolbar.middleware.DebugToolbarMiddleware")
+        INSTALLED_APPS.append("debug_toolbar")
+
     DEBUG_TOOLBAR_PANELS = [
         # adds a request history to the debug toolbar
         "ddt_request_history.panels.request_history.RequestHistoryPanel",
-        "debug_toolbar.panels.versions.VersionsPanel",
         "debug_toolbar.panels.timer.TimerPanel",
-        "debug_toolbar.panels.settings.SettingsPanel",
         "debug_toolbar.panels.headers.HeadersPanel",
         "debug_toolbar.panels.request.RequestPanel",
         "debug_toolbar.panels.sql.SQLPanel",
-        "debug_toolbar.panels.templates.TemplatesPanel",
-        "debug_toolbar.panels.staticfiles.StaticFilesPanel",
-        "debug_toolbar.panels.cache.CachePanel",
-        "debug_toolbar.panels.signals.SignalsPanel",
-        "debug_toolbar.panels.logging.LoggingPanel",
-        "debug_toolbar.panels.redirects.RedirectsPanel",
         "debug_toolbar.panels.profiling.ProfilingPanel",
     ]
     DEBUG_TOOLBAR_CONFIG = {"RESULTS_CACHE_SIZE": 100}
@@ -300,7 +307,7 @@ LOGGING = {
     "formatters": {
         "verbose": {
             "format": (
-                "%(levelname)s %(name)s %(message)s" " [PID:%(process)d:%(threadName)s]"
+                "%(levelname)s %(name)s %(message)s [PID:%(process)d:%(threadName)s]"
             )
         },
         "simple": {"format": "%(levelname)s %(message)s"},
@@ -351,6 +358,13 @@ OPENEXCHANGERATES_API_KEY = os.environ.get("OPENEXCHANGERATES_API_KEY")
 # If you are subscribed to a paid vatlayer plan, you can enable HTTPS.
 VATLAYER_ACCESS_KEY = os.environ.get("VATLAYER_ACCESS_KEY")
 VATLAYER_USE_HTTPS = get_bool_from_env("VATLAYER_USE_HTTPS", False)
+
+# Avatax supports two ways of log in - username:password or account:license
+AVATAX_USERNAME_OR_ACCOUNT = os.environ.get("AVATAX_USERNAME_OR_ACCOUNT")
+AVATAX_PASSWORD_OR_LICENSE = os.environ.get("AVATAX_PASSWORD_OR_LICENSE")
+AVATAX_USE_SANDBOX = os.environ.get("AVATAX_USE_SANDBOX", DEBUG)
+AVATAX_COMPANY_NAME = os.environ.get("AVATAX_COMPANY_NAME", "DEFAULT")
+AVATAX_AUTOCOMMIT = os.environ.get("AVATAX_AUTOCOMMIT", False)
 
 ACCOUNT_ACTIVATION_DAYS = 3
 
@@ -411,11 +425,27 @@ AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
 AWS_STORAGE_BUCKET_NAME = os.environ.get("AWS_STORAGE_BUCKET_NAME")
 AWS_DEFAULT_ACL = os.environ.get("AWS_DEFAULT_ACL", None)
 
+# Google Cloud Storage configuration
+GS_PROJECT_ID = os.environ.get("GS_PROJECT_ID")
+GS_STORAGE_BUCKET_NAME = os.environ.get("GS_STORAGE_BUCKET_NAME")
+GS_MEDIA_BUCKET_NAME = os.environ.get("GS_MEDIA_BUCKET_NAME")
+GS_AUTO_CREATE_BUCKET = get_bool_from_env("GS_AUTO_CREATE_BUCKET", False)
+
+# If GOOGLE_APPLICATION_CREDENTIALS is set there is no need to load OAuth token
+# See https://django-storages.readthedocs.io/en/latest/backends/gcloud.html
+if "GOOGLE_APPLICATION_CREDENTIALS" not in os.environ:
+    GS_CREDENTIALS = os.environ.get("GS_CREDENTIALS")
+
 if AWS_STORAGE_BUCKET_NAME:
     STATICFILES_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+elif GS_STORAGE_BUCKET_NAME:
+    STATICFILES_STORAGE = "storages.backends.gcloud.GoogleCloudStorage"
 
 if AWS_MEDIA_BUCKET_NAME:
     DEFAULT_FILE_STORAGE = "saleor.core.storages.S3MediaStorage"
+    THUMBNAIL_DEFAULT_STORAGE = DEFAULT_FILE_STORAGE
+elif GS_MEDIA_BUCKET_NAME:
+    DEFAULT_FILE_STORAGE = "saleor.core.storages.GCSMediaStorage"
     THUMBNAIL_DEFAULT_STORAGE = DEFAULT_FILE_STORAGE
 
 MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
@@ -514,7 +544,7 @@ CELERY_TASK_ALWAYS_EAGER = not CELERY_BROKER_URL
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
-CELERY_RESULT_BACKEND = "django-db"
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", None)
 
 # Impersonate module settings
 IMPERSONATE = {
@@ -579,42 +609,65 @@ CHECKOUT_PAYMENT_GATEWAYS = {
 }
 
 PAYMENT_GATEWAYS = {
-    DUMMY: {"module": "saleor.payment.gateways.dummy", "connection_params": {}},
+    DUMMY: {
+        "module": "saleor.payment.gateways.dummy",
+        "config": {
+            "auto_capture": True,
+            "store_card": False,
+            "connection_params": {},
+            "template_path": "order/payment/dummy.html",
+        },
+    },
     BRAINTREE: {
         "module": "saleor.payment.gateways.braintree",
-        "connection_params": {
-            "sandbox_mode": get_bool_from_env("BRAINTREE_SANDBOX_MODE", True),
-            "merchant_id": os.environ.get("BRAINTREE_MERCHANT_ID"),
-            "public_key": os.environ.get("BRAINTREE_PUBLIC_KEY"),
-            "private_key": os.environ.get("BRAINTREE_PRIVATE_KEY"),
+        "config": {
+            "auto_capture": get_bool_from_env("BRAINTREE_AUTO_CAPTURE", True),
+            "store_card": get_bool_from_env("BRAINTREE_STORE_CARD", False),
+            "template_path": "order/payment/braintree.html",
+            "connection_params": {
+                "sandbox_mode": get_bool_from_env("BRAINTREE_SANDBOX_MODE", True),
+                "merchant_id": os.environ.get("BRAINTREE_MERCHANT_ID"),
+                "public_key": os.environ.get("BRAINTREE_PUBLIC_KEY"),
+                "private_key": os.environ.get("BRAINTREE_PRIVATE_KEY"),
+            },
         },
     },
     RAZORPAY: {
         "module": "saleor.payment.gateways.razorpay",
-        "connection_params": {
-            "public_key": os.environ.get("RAZORPAY_PUBLIC_KEY"),
-            "secret_key": os.environ.get("RAZORPAY_SECRET_KEY"),
-            "prefill": get_bool_from_env("RAZORPAY_PREFILL", True),
-            "store_name": os.environ.get("RAZORPAY_STORE_NAME"),
-            "store_image": os.environ.get("RAZORPAY_STORE_IMAGE"),
+        "config": {
+            "store_card": get_bool_from_env("RAZORPAY_STORE_CARD", False),
+            "auto_capture": get_bool_from_env("RAZORPAY_AUTO_CAPTURE", None),
+            "template_path": "order/payment/razorpay.html",
+            "connection_params": {
+                "public_key": os.environ.get("RAZORPAY_PUBLIC_KEY"),
+                "secret_key": os.environ.get("RAZORPAY_SECRET_KEY"),
+                "prefill": get_bool_from_env("RAZORPAY_PREFILL", True),
+                "store_name": os.environ.get("RAZORPAY_STORE_NAME"),
+                "store_image": os.environ.get("RAZORPAY_STORE_IMAGE"),
+            },
         },
     },
     STRIPE: {
         "module": "saleor.payment.gateways.stripe",
-        "connection_params": {
-            "public_key": os.environ.get("STRIPE_PUBLIC_KEY"),
-            "secret_key": os.environ.get("STRIPE_SECRET_KEY"),
-            "store_name": os.environ.get("STRIPE_STORE_NAME", "Saleor"),
-            "store_image": os.environ.get("STRIPE_STORE_IMAGE", None),
-            "prefill": get_bool_from_env("STRIPE_PREFILL", True),
-            "remember_me": os.environ.get("STRIPE_REMEMBER_ME", True),
-            "locale": os.environ.get("STRIPE_LOCALE", "auto"),
-            "enable_billing_address": os.environ.get(
-                "STRIPE_ENABLE_BILLING_ADDRESS", False
-            ),
-            "enable_shipping_address": os.environ.get(
-                "STRIPE_ENABLE_SHIPPING_ADDRESS", False
-            ),
+        "config": {
+            "store_card": get_bool_from_env("STRIPE_STORE_CARD", False),
+            "auto_capture": get_bool_from_env("STRIPE_AUTO_CAPTURE", True),
+            "template_path": "order/payment/stripe.html",
+            "connection_params": {
+                "public_key": os.environ.get("STRIPE_PUBLIC_KEY"),
+                "secret_key": os.environ.get("STRIPE_SECRET_KEY"),
+                "store_name": os.environ.get("STRIPE_STORE_NAME", "Saleor"),
+                "store_image": os.environ.get("STRIPE_STORE_IMAGE", None),
+                "prefill": get_bool_from_env("STRIPE_PREFILL", True),
+                "remember_me": os.environ.get("STRIPE_REMEMBER_ME", True),
+                "locale": os.environ.get("STRIPE_LOCALE", "auto"),
+                "enable_billing_address": os.environ.get(
+                    "STRIPE_ENABLE_BILLING_ADDRESS", False
+                ),
+                "enable_shipping_address": os.environ.get(
+                    "STRIPE_ENABLE_SHIPPING_ADDRESS", False
+                ),
+            },
         },
     },
 }
@@ -623,3 +676,12 @@ GRAPHENE = {
     "RELAY_CONNECTION_ENFORCE_FIRST_OR_LAST": True,
     "RELAY_CONNECTION_MAX_LIMIT": 100,
 }
+
+EXTENSIONS_MANAGER = "saleor.core.extensions.manager.ExtensionsManager"
+
+PLUGINS = os.environ.get("PLUGINS", [])
+
+# Whether DraftJS should be used be used instead of HTML
+# True to use DraftJS (JSON based), for the 2.0 dashboard
+# False to use the old editor from dashboard 1.0
+USE_JSON_CONTENT = get_bool_from_env("USE_JSON_CONTENT", False)

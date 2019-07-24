@@ -1,4 +1,3 @@
-import Checkbox from "@material-ui/core/Checkbox";
 import {
   createStyles,
   Theme,
@@ -10,21 +9,22 @@ import TableBody from "@material-ui/core/TableBody";
 import TableCell from "@material-ui/core/TableCell";
 import TableFooter from "@material-ui/core/TableFooter";
 import TableRow from "@material-ui/core/TableRow";
-import * as React from "react";
+import React from "react";
 
-import { DateTime } from "../../../components/Date";
-import Money from "../../../components/Money";
-import Skeleton from "../../../components/Skeleton";
-import TableHead from "../../../components/TableHead";
-import TablePagination from "../../../components/TablePagination";
-import i18n from "../../../i18n";
+import Checkbox from "@saleor/components/Checkbox";
+import { DateTime } from "@saleor/components/Date";
+import Money from "@saleor/components/Money";
+import Skeleton from "@saleor/components/Skeleton";
+import TableHead from "@saleor/components/TableHead";
+import TablePagination from "@saleor/components/TablePagination";
+import i18n from "@saleor/i18n";
 import {
   maybe,
   renderCollection,
   transformOrderStatus,
   transformPaymentStatus
-} from "../../../misc";
-import { ListActions, ListProps } from "../../../types";
+} from "@saleor/misc";
+import { ListActions, ListProps } from "@saleor/types";
 import { OrderDraftList_draftOrders_edges_node } from "../../types/OrderDraftList";
 
 const styles = (theme: Theme) =>
@@ -63,14 +63,17 @@ export const OrderDraftList = withStyles(styles, { name: "OrderDraftList" })(
   ({
     classes,
     disabled,
+    settings,
     orders,
     pageInfo,
     onPreviousPage,
     onNextPage,
+    onUpdateListSettings,
     onRowClick,
     isChecked,
     selected,
     toggle,
+    toggleAll,
     toolbar
   }: OrderDraftListProps) => {
     const orderDraftList = orders
@@ -82,29 +85,34 @@ export const OrderDraftList = withStyles(styles, { name: "OrderDraftList" })(
       : undefined;
     return (
       <Table>
-        <TableHead selected={selected} toolbar={toolbar}>
-          <TableRow>
-            <TableCell />
-            <TableCell padding="dense" className={classes.colNumber}>
-              {i18n.t("No. of Order", { context: "table header" })}
-            </TableCell>
-            <TableCell padding="dense" className={classes.colDate}>
-              {i18n.t("Date", { context: "table header" })}
-            </TableCell>
-            <TableCell padding="dense" className={classes.colCustomer}>
-              {i18n.t("Customer", { context: "table header" })}
-            </TableCell>
-            <TableCell className={classes.colTotal} padding="dense">
-              {i18n.t("Total", { context: "table header" })}
-            </TableCell>
-          </TableRow>
+        <TableHead
+          selected={selected}
+          disabled={disabled}
+          items={orders}
+          toggleAll={toggleAll}
+          toolbar={toolbar}
+        >
+          <TableCell padding="dense" className={classes.colNumber}>
+            {i18n.t("No. of Order", { context: "table header" })}
+          </TableCell>
+          <TableCell padding="dense" className={classes.colDate}>
+            {i18n.t("Date", { context: "table header" })}
+          </TableCell>
+          <TableCell padding="dense" className={classes.colCustomer}>
+            {i18n.t("Customer", { context: "table header" })}
+          </TableCell>
+          <TableCell className={classes.colTotal} padding="dense">
+            {i18n.t("Total", { context: "table header" })}
+          </TableCell>
         </TableHead>
         <TableFooter>
           <TableRow>
             <TablePagination
               colSpan={5}
+              settings={settings}
               hasNextPage={pageInfo && !disabled ? pageInfo.hasNextPage : false}
               onNextPage={onNextPage}
+              onUpdateListSettings={onUpdateListSettings}
               hasPreviousPage={
                 pageInfo && !disabled ? pageInfo.hasPreviousPage : false
               }
@@ -128,13 +136,9 @@ export const OrderDraftList = withStyles(styles, { name: "OrderDraftList" })(
                 >
                   <TableCell padding="checkbox">
                     <Checkbox
-                      color="primary"
                       checked={isSelected}
                       disabled={disabled}
-                      onClick={event => {
-                        toggle(order.id);
-                        event.stopPropagation();
-                      }}
+                      onChange={() => toggle(order.id)}
                     />
                   </TableCell>
                   <TableCell padding="dense" className={classes.colNumber}>

@@ -3,6 +3,22 @@ schema {
   mutation: Mutations
 }
 
+input AccountInput {
+  firstName: String
+  lastName: String
+  defaultBillingAddress: AddressInput
+  defaultShippingAddress: AddressInput
+}
+
+type AccountRequestDeletion {
+  errors: [Error!]
+}
+
+type AccountUpdate {
+  errors: [Error!]
+  user: User
+}
+
 type Address implements Node {
   id: ID!
   firstName: String!
@@ -82,12 +98,6 @@ type AddressValidationData {
   postalCodePrefix: String
 }
 
-input AddressValidationInput {
-  countryCode: String
-  countryArea: String
-  cityArea: String
-}
-
 type AssignNavigation {
   errors: [Error!]
   menu: Menu
@@ -97,6 +107,8 @@ type Attribute implements Node {
   id: ID!
   productType: ProductType
   productVariantType: ProductType
+  privateMeta: [MetaStore]!
+  meta: [MetaStore]!
   name: String
   slug: String
   values: [AttributeValue]
@@ -106,6 +118,16 @@ type Attribute implements Node {
 type AttributeBulkDelete {
   errors: [Error!]
   count: Int!
+}
+
+type AttributeClearMeta {
+  errors: [Error!]
+  attribute: Attribute
+}
+
+type AttributeClearPrivateMeta {
+  errors: [Error!]
+  attribute: Attribute
 }
 
 type AttributeCountableConnection {
@@ -171,8 +193,18 @@ input AttributeUpdateInput {
   addValues: [AttributeValueCreateInput]
 }
 
+type AttributeUpdateMeta {
+  errors: [Error!]
+  attribute: Attribute
+}
+
+type AttributeUpdatePrivateMeta {
+  errors: [Error!]
+  attribute: Attribute
+}
+
 type AttributeValue implements Node {
-  sortOrder: Int!
+  sortOrder: Int
   id: ID!
   name: String
   slug: String
@@ -275,6 +307,8 @@ type Category implements Node {
   descriptionJson: JSONString!
   parent: Category
   level: Int!
+  privateMeta: [MetaStore]!
+  meta: [MetaStore]!
   ancestors(before: String, after: String, first: Int, last: Int): CategoryCountableConnection
   products(before: String, after: String, first: Int, last: Int): ProductCountableConnection
   url: String
@@ -286,6 +320,16 @@ type Category implements Node {
 type CategoryBulkDelete {
   errors: [Error!]
   count: Int!
+}
+
+type CategoryClearMeta {
+  errors: [Error!]
+  category: Category
+}
+
+type CategoryClearPrivateMeta {
+  errors: [Error!]
+  category: Category
 }
 
 type CategoryCountableConnection {
@@ -339,6 +383,16 @@ type CategoryUpdate {
   category: Category
 }
 
+type CategoryUpdateMeta {
+  errors: [Error!]
+  category: Category
+}
+
+type CategoryUpdatePrivateMeta {
+  errors: [Error!]
+  category: Category
+}
+
 type Checkout implements Node {
   created: DateTime!
   lastChange: DateTime!
@@ -353,7 +407,10 @@ type Checkout implements Node {
   discountName: String
   translatedDiscountName: String
   voucherCode: String
+  giftCards: [GiftCard]
   id: ID!
+  privateMeta: [MetaStore]!
+  meta: [MetaStore]!
   availableShippingMethods: [ShippingMethod]!
   availablePaymentGateways: [GatewaysEnum]!
   email: String!
@@ -364,7 +421,22 @@ type Checkout implements Node {
   totalPrice: TaxedMoney
 }
 
+type CheckoutAddPromoCode {
+  errors: [Error!]
+  checkout: Checkout
+}
+
 type CheckoutBillingAddressUpdate {
+  errors: [Error!]
+  checkout: Checkout
+}
+
+type CheckoutClearStoredMeta {
+  errors: [Error!]
+  checkout: Checkout
+}
+
+type CheckoutClearStoredPrivateMeta {
   errors: [Error!]
   checkout: Checkout
 }
@@ -457,12 +529,27 @@ type CheckoutPaymentCreate {
   payment: Payment
 }
 
+type CheckoutRemovePromoCode {
+  errors: [Error!]
+  checkout: Checkout
+}
+
 type CheckoutShippingAddressUpdate {
   errors: [Error!]
   checkout: Checkout
 }
 
 type CheckoutShippingMethodUpdate {
+  errors: [Error!]
+  checkout: Checkout
+}
+
+type CheckoutUpdateMeta {
+  errors: [Error!]
+  checkout: Checkout
+}
+
+type CheckoutUpdatePrivateMeta {
   errors: [Error!]
   checkout: Checkout
 }
@@ -487,6 +574,8 @@ type Collection implements Node {
   slug: String!
   description: String!
   descriptionJson: JSONString!
+  privateMeta: [MetaStore]!
+  meta: [MetaStore]!
   products(before: String, after: String, first: Int, last: Int): ProductCountableConnection
   backgroundImage(size: Int): Image
   publishedDate: Date @deprecated(reason: "publishedDate is deprecated, use publicationDate instead")
@@ -506,6 +595,16 @@ type CollectionBulkDelete {
 type CollectionBulkPublish {
   errors: [Error!]
   count: Int!
+}
+
+type CollectionClearMeta {
+  errors: [Error!]
+  collection: Collection
+}
+
+type CollectionClearPrivateMeta {
+  errors: [Error!]
+  collection: Collection
 }
 
 type CollectionCountableConnection {
@@ -569,6 +668,11 @@ type CollectionRemoveProducts {
   collection: Collection
 }
 
+type CollectionReorderProducts {
+  errors: [Error!]
+  collection: Collection
+}
+
 type CollectionTranslate {
   errors: [Error!]
   collection: Collection
@@ -587,6 +691,269 @@ type CollectionTranslation implements Node {
 type CollectionUpdate {
   errors: [Error!]
   collection: Collection
+}
+
+type CollectionUpdateMeta {
+  errors: [Error!]
+  collection: Collection
+}
+
+type CollectionUpdatePrivateMeta {
+  errors: [Error!]
+  collection: Collection
+}
+
+enum CountryCode {
+  AF
+  AX
+  AL
+  DZ
+  AS
+  AD
+  AO
+  AI
+  AQ
+  AG
+  AR
+  AM
+  AW
+  AU
+  AT
+  AZ
+  BS
+  BH
+  BD
+  BB
+  BY
+  BE
+  BZ
+  BJ
+  BM
+  BT
+  BO
+  BQ
+  BA
+  BW
+  BV
+  BR
+  IO
+  BN
+  BG
+  BF
+  BI
+  CV
+  KH
+  CM
+  CA
+  KY
+  CF
+  TD
+  CL
+  CN
+  CX
+  CC
+  CO
+  KM
+  CG
+  CD
+  CK
+  CR
+  CI
+  HR
+  CU
+  CW
+  CY
+  CZ
+  DK
+  DJ
+  DM
+  DO
+  EC
+  EG
+  SV
+  GQ
+  ER
+  EE
+  SZ
+  ET
+  EU
+  FK
+  FO
+  FJ
+  FI
+  FR
+  GF
+  PF
+  TF
+  GA
+  GM
+  GE
+  DE
+  GH
+  GI
+  GR
+  GL
+  GD
+  GP
+  GU
+  GT
+  GG
+  GN
+  GW
+  GY
+  HT
+  HM
+  VA
+  HN
+  HK
+  HU
+  IS
+  IN
+  ID
+  IR
+  IQ
+  IE
+  IM
+  IL
+  IT
+  JM
+  JP
+  JE
+  JO
+  KZ
+  KE
+  KI
+  KW
+  KG
+  LA
+  LV
+  LB
+  LS
+  LR
+  LY
+  LI
+  LT
+  LU
+  MO
+  MK
+  MG
+  MW
+  MY
+  MV
+  ML
+  MT
+  MH
+  MQ
+  MR
+  MU
+  YT
+  MX
+  FM
+  MD
+  MC
+  MN
+  ME
+  MS
+  MA
+  MZ
+  MM
+  NA
+  NR
+  NP
+  NL
+  NC
+  NZ
+  NI
+  NE
+  NG
+  NU
+  NF
+  KP
+  MP
+  NO
+  OM
+  PK
+  PW
+  PS
+  PA
+  PG
+  PY
+  PE
+  PH
+  PN
+  PL
+  PT
+  PR
+  QA
+  RE
+  RO
+  RU
+  RW
+  BL
+  SH
+  KN
+  LC
+  MF
+  PM
+  VC
+  WS
+  SM
+  ST
+  SA
+  SN
+  RS
+  SC
+  SL
+  SG
+  SX
+  SK
+  SI
+  SB
+  SO
+  ZA
+  GS
+  KR
+  SS
+  ES
+  LK
+  SD
+  SR
+  SJ
+  SE
+  CH
+  SY
+  TW
+  TJ
+  TZ
+  TH
+  TL
+  TG
+  TK
+  TO
+  TT
+  TN
+  TR
+  TM
+  TC
+  TV
+  UG
+  UA
+  AE
+  GB
+  UM
+  US
+  UY
+  UZ
+  VU
+  VE
+  VN
+  VG
+  VI
+  WF
+  EH
+  YE
+  ZM
+  ZW
 }
 
 type CountryDisplay {
@@ -627,6 +994,30 @@ type CustomerCreate {
 type CustomerDelete {
   errors: [Error!]
   user: User
+}
+
+type CustomerEvent implements Node {
+  id: ID!
+  date: DateTime
+  type: CustomerEventsEnum
+  user(id: ID): User
+  message: String
+  count: Int
+  order: Order
+  orderLine: OrderLine
+}
+
+enum CustomerEventsEnum {
+  ACCOUNT_CREATED
+  PASSWORD_RESET_LINK_SENT
+  PASSWORD_RESET
+  PLACED_ORDER
+  NOTE_ADDED_TO_ORDER
+  DIGITAL_LINK_DOWNLOADED
+  CUSTOMER_DELETED
+  NAME_ASSIGNED
+  EMAIL_ASSIGNED
+  NOTE_ADDED
 }
 
 input CustomerFilterInput {
@@ -684,6 +1075,11 @@ input DateRangeInput {
 
 scalar DateTime
 
+input DateTimeRangeInput {
+  gte: DateTime
+  lte: DateTime
+}
+
 scalar Decimal
 
 type DigitalContent implements Node {
@@ -695,6 +1091,8 @@ type DigitalContent implements Node {
   urlValidDays: Int
   urls: [DigitalContentUrl]
   id: ID!
+  privateMeta: [MetaStore]!
+  meta: [MetaStore]!
 }
 
 type DigitalContentCountableConnection {
@@ -910,12 +1308,75 @@ input FulfillmentUpdateTrackingInput {
 
 enum GatewaysEnum {
   DUMMY
+  BRAINTREE
+  RAZORPAY
+  STRIPE
 }
 
 scalar GenericScalar
 
 type Geolocalization {
   country: CountryDisplay
+}
+
+type GiftCard implements Node {
+  code: String
+  user: User
+  created: DateTime!
+  startDate: Date!
+  endDate: Date
+  lastUsedOn: DateTime
+  isActive: Boolean!
+  initialBalance: Money
+  currentBalance: Money
+  id: ID!
+  displayCode: String
+}
+
+type GiftCardActivate {
+  errors: [Error!]
+  giftCard: GiftCard
+}
+
+type GiftCardCountableConnection {
+  pageInfo: PageInfo!
+  edges: [GiftCardCountableEdge!]!
+  totalCount: Int
+}
+
+type GiftCardCountableEdge {
+  node: GiftCard!
+  cursor: String!
+}
+
+type GiftCardCreate {
+  errors: [Error!]
+  giftCard: GiftCard
+}
+
+input GiftCardCreateInput {
+  startDate: Date
+  endDate: Date
+  balance: Decimal
+  userEmail: String
+  code: String
+}
+
+type GiftCardDeactivate {
+  errors: [Error!]
+  giftCard: GiftCard
+}
+
+type GiftCardUpdate {
+  errors: [Error!]
+  giftCard: GiftCard
+}
+
+input GiftCardUpdateInput {
+  startDate: Date
+  endDate: Date
+  balance: Decimal
+  userEmail: String
 }
 
 type HomepageCollectionUpdate {
@@ -944,8 +1405,10 @@ enum LanguageCodeEnum {
   CS
   DA
   DE
+  EL
   EN
   ES
+  ES_CO
   ET
   FA
   FR
@@ -953,9 +1416,11 @@ enum LanguageCodeEnum {
   HU
   HY
   ID
+  IS
   IT
   JA
   KO
+  LT
   MN
   NB
   NL
@@ -965,6 +1430,7 @@ enum LanguageCodeEnum {
   RO
   RU
   SK
+  SQ
   SR
   SW
   SV
@@ -1034,7 +1500,7 @@ input MenuInput {
 
 type MenuItem implements Node {
   id: ID!
-  sortOrder: Int!
+  sortOrder: Int
   menu: Menu!
   name: String!
   parent: MenuItem
@@ -1123,6 +1589,34 @@ type MenuUpdate {
   menu: Menu
 }
 
+type MetaClientStore {
+  name: String!
+  metadata: [MetaItem]!
+}
+
+input MetaInput {
+  namespace: String!
+  clientName: String!
+  key: String!
+  value: String!
+}
+
+type MetaItem {
+  key: String!
+  value: String!
+}
+
+input MetaPath {
+  namespace: String!
+  clientName: String!
+  key: String!
+}
+
+type MetaStore {
+  namespace: String!
+  clients: [MetaClientStore]!
+}
+
 type Money {
   currency: String!
   amount: Float!
@@ -1134,6 +1628,11 @@ type MoneyRange {
   stop: Money
 }
 
+input MoveProductInput {
+  productId: ID!
+  sortOrder: Int
+}
+
 type Mutations {
   authorizationKeyAdd(input: AuthorizationKeyInput!, keyType: AuthorizationKeyType!): AuthorizationKeyAdd
   authorizationKeyDelete(keyType: AuthorizationKeyType!): AuthorizationKeyDelete
@@ -1142,6 +1641,7 @@ type Mutations {
   shopSettingsUpdate(input: ShopSettingsInput!): ShopSettingsUpdate
   shopFetchTaxRates: ShopFetchTaxRates
   shopSettingsTranslate(input: ShopSettingsTranslationInput!, languageCode: LanguageCodeEnum!): ShopSettingsTranslate
+  shopAddressUpdate(input: AddressInput): ShopAddressUpdate
   shippingPriceCreate(input: ShippingPriceInput!): ShippingPriceCreate
   shippingPriceDelete(id: ID!): ShippingPriceDelete
   shippingPriceBulkDelete(ids: [ID]!): ShippingPriceBulkDelete
@@ -1156,6 +1656,10 @@ type Mutations {
   attributeBulkDelete(ids: [ID]!): AttributeBulkDelete
   attributeUpdate(id: ID!, input: AttributeUpdateInput!): AttributeUpdate
   attributeTranslate(id: ID!, input: NameTranslationInput!, languageCode: LanguageCodeEnum!): AttributeTranslate
+  attributeUpdateMetadata(id: ID!, input: MetaInput!): AttributeUpdateMeta
+  attributeClearMetadata(id: ID!, input: MetaPath!): AttributeClearMeta
+  attributeUpdatePrivateMetadata(id: ID!, input: MetaInput!): AttributeUpdatePrivateMeta
+  attributeClearPrivateMetadata(id: ID!, input: MetaPath!): AttributeClearPrivateMeta
   attributeValueCreate(attribute: ID!, input: AttributeValueCreateInput!): AttributeValueCreate
   attributeValueDelete(id: ID!): AttributeValueDelete
   attributeValueBulkDelete(ids: [ID]!): AttributeValueBulkDelete
@@ -1166,20 +1670,33 @@ type Mutations {
   categoryBulkDelete(ids: [ID]!): CategoryBulkDelete
   categoryUpdate(id: ID!, input: CategoryInput!): CategoryUpdate
   categoryTranslate(id: ID!, input: TranslationInput!, languageCode: LanguageCodeEnum!): CategoryTranslate
+  categoryUpdateMetadata(id: ID!, input: MetaInput!): CategoryUpdateMeta
+  categoryClearMetadata(id: ID!, input: MetaPath!): CategoryClearMeta
+  categoryUpdatePrivateMetadata(id: ID!, input: MetaInput!): CategoryUpdatePrivateMeta
+  categoryClearPrivateMetadata(id: ID!, input: MetaPath!): CategoryClearPrivateMeta
   collectionAddProducts(collectionId: ID!, products: [ID]!): CollectionAddProducts
   collectionCreate(input: CollectionCreateInput!): CollectionCreate
   collectionDelete(id: ID!): CollectionDelete
+  collectionReorderProducts(collectionId: ID!, moves: [MoveProductInput]!): CollectionReorderProducts
   collectionBulkDelete(ids: [ID]!): CollectionBulkDelete
   collectionBulkPublish(ids: [ID]!, isPublished: Boolean!): CollectionBulkPublish
   collectionRemoveProducts(collectionId: ID!, products: [ID]!): CollectionRemoveProducts
   collectionUpdate(id: ID!, input: CollectionInput!): CollectionUpdate
   collectionTranslate(id: ID!, input: TranslationInput!, languageCode: LanguageCodeEnum!): CollectionTranslate
+  collectionUpdateMetadata(id: ID!, input: MetaInput!): CollectionUpdateMeta
+  collectionClearMetadata(id: ID!, input: MetaPath!): CollectionClearMeta
+  collectionUpdatePrivateMetadata(id: ID!, input: MetaInput!): CollectionUpdatePrivateMeta
+  collectionClearPrivateMetadata(id: ID!, input: MetaPath!): CollectionClearPrivateMeta
   productCreate(input: ProductCreateInput!): ProductCreate
   productDelete(id: ID!): ProductDelete
   productBulkDelete(ids: [ID]!): ProductBulkDelete
   productBulkPublish(ids: [ID]!, isPublished: Boolean!): ProductBulkPublish
   productUpdate(id: ID!, input: ProductInput!): ProductUpdate
   productTranslate(id: ID!, input: TranslationInput!, languageCode: LanguageCodeEnum!): ProductTranslate
+  productUpdateMetadata(id: ID!, input: MetaInput!): ProductUpdateMeta
+  productClearMetadata(id: ID!, input: MetaPath!): ProductClearMeta
+  productUpdatePrivateMetadata(id: ID!, input: MetaInput!): ProductUpdatePrivateMeta
+  productClearPrivateMetadata(id: ID!, input: MetaPath!): ProductClearPrivateMeta
   productImageCreate(input: ProductImageCreateInput!): ProductImageCreate
   productImageDelete(id: ID!): ProductImageDelete
   productImageBulkDelete(ids: [ID]!): ProductImageBulkDelete
@@ -1189,6 +1706,10 @@ type Mutations {
   productTypeDelete(id: ID!): ProductTypeDelete
   productTypeBulkDelete(ids: [ID]!): ProductTypeBulkDelete
   productTypeUpdate(id: ID!, input: ProductTypeInput!): ProductTypeUpdate
+  productTypeUpdateMetadata(id: ID!, input: MetaInput!): ProductTypeUpdateMeta
+  productTypeClearMetadata(id: ID!, input: MetaPath!): ProductTypeClearMeta
+  productTypeUpdatePrivateMetadata(id: ID!, input: MetaInput!): ProductTypeUpdatePrivateMeta
+  productTypeClearPrivateMetadata(id: ID!, input: MetaPath!): ProductTypeClearPrivateMeta
   digitalContentCreate(input: DigitalContentUploadInput!, variantId: ID!): DigitalContentCreate
   digitalContentDelete(variantId: ID!): DigitalContentDelete
   digitalContentUpdate(input: DigitalContentInput!, variantId: ID!): DigitalContentUpdate
@@ -1198,6 +1719,10 @@ type Mutations {
   productVariantBulkDelete(ids: [ID]!): ProductVariantBulkDelete
   productVariantUpdate(id: ID!, input: ProductVariantInput!): ProductVariantUpdate
   productVariantTranslate(id: ID!, input: NameTranslationInput!, languageCode: LanguageCodeEnum!): ProductVariantTranslate
+  productVariantUpdateMetadata(id: ID!, input: MetaInput!): ProductVariantUpdateMeta
+  productVariantClearMetadata(id: ID!, input: MetaPath!): ProductVariantClearMeta
+  productVariantUpdatePrivateMetadata(id: ID!, input: MetaInput!): ProductVariantUpdatePrivateMeta
+  productVariantClearPrivateMetadata(id: ID!, input: MetaPath!): ProductVariantClearPrivateMeta
   variantImageAssign(imageId: ID!, variantId: ID!): VariantImageAssign
   variantImageUnassign(imageId: ID!, variantId: ID!): VariantImageUnassign
   paymentCapture(amount: Decimal, paymentId: ID!): PaymentCapture
@@ -1241,6 +1766,10 @@ type Mutations {
   menuItemUpdate(id: ID!, input: MenuItemInput!): MenuItemUpdate
   menuItemTranslate(id: ID!, input: NameTranslationInput!, languageCode: LanguageCodeEnum!): MenuItemTranslate
   menuItemMove(menu: ID!, moves: [MenuItemMoveInput]!): MenuItemMove
+  giftCardActivate(id: ID!): GiftCardActivate
+  giftCardCreate(input: GiftCardCreateInput!): GiftCardCreate
+  giftCardDeactivate(id: ID!): GiftCardDeactivate
+  giftCardUpdate(id: ID!, input: GiftCardUpdateInput!): GiftCardUpdate
   saleCreate(input: SaleInput!): SaleCreate
   saleDelete(id: ID!): SaleDelete
   saleBulkDelete(ids: [ID]!): SaleBulkDelete
@@ -1258,8 +1787,9 @@ type Mutations {
   tokenCreate(email: String!, password: String!): CreateToken
   tokenRefresh(token: String!): Refresh
   tokenVerify(token: String!): VerifyToken
+  checkoutAddPromoCode(checkoutId: ID!, promoCode: String!): CheckoutAddPromoCode
   checkoutBillingAddressUpdate(billingAddress: AddressInput!, checkoutId: ID!): CheckoutBillingAddressUpdate
-  checkoutComplete(checkoutId: ID!): CheckoutComplete
+  checkoutComplete(checkoutId: ID!, storeSource: Boolean = false): CheckoutComplete
   checkoutCreate(input: CheckoutCreateInput!): CheckoutCreate
   checkoutCustomerAttach(checkoutId: ID!, customerId: ID!): CheckoutCustomerAttach
   checkoutCustomerDetach(checkoutId: ID!): CheckoutCustomerDetach
@@ -1267,10 +1797,15 @@ type Mutations {
   checkoutLineDelete(checkoutId: ID!, lineId: ID): CheckoutLineDelete
   checkoutLinesAdd(checkoutId: ID!, lines: [CheckoutLineInput]!): CheckoutLinesAdd
   checkoutLinesUpdate(checkoutId: ID!, lines: [CheckoutLineInput]!): CheckoutLinesUpdate
+  checkoutRemovePromoCode(checkoutId: ID!, promoCode: String!): CheckoutRemovePromoCode
   checkoutPaymentCreate(checkoutId: ID!, input: PaymentInput!): CheckoutPaymentCreate
   checkoutShippingAddressUpdate(checkoutId: ID!, shippingAddress: AddressInput!): CheckoutShippingAddressUpdate
   checkoutShippingMethodUpdate(checkoutId: ID, shippingMethodId: ID!): CheckoutShippingMethodUpdate
   checkoutUpdateVoucher(checkoutId: ID!, voucherCode: String): CheckoutUpdateVoucher
+  checkoutUpdateMetadata(id: ID!, input: MetaInput!): CheckoutUpdateMeta
+  checkoutClearMetadata(id: ID!, input: MetaPath!): CheckoutClearStoredMeta
+  checkoutUpdatePrivateMetadata(id: ID!, input: MetaInput!): CheckoutUpdatePrivateMeta
+  checkoutClearPrivateMetadata(id: ID!, input: MetaPath!): CheckoutClearStoredPrivateMeta
   passwordReset(email: String!): PasswordReset
   setPassword(id: ID!, input: SetPasswordInput!): SetPassword
   customerCreate(input: UserCreateInput!): CustomerCreate
@@ -1282,6 +1817,8 @@ type Mutations {
   customerAddressCreate(input: AddressInput!, type: AddressTypeEnum): CustomerAddressCreate
   customerSetDefaultAddress(id: ID!, type: AddressTypeEnum!): CustomerSetDefaultAddress
   loggedUserUpdate(input: UserAddressInput!): LoggedUserUpdate
+  accountUpdate(input: AccountInput!): AccountUpdate
+  accountRequestDeletion: AccountRequestDeletion
   staffCreate(input: StaffCreateInput!): StaffCreate
   staffDelete(id: ID!): StaffDelete
   staffBulkDelete(ids: [ID]!): StaffBulkDelete
@@ -1293,6 +1830,10 @@ type Mutations {
   userAvatarUpdate(image: Upload!): UserAvatarUpdate
   userAvatarDelete: UserAvatarDelete
   userBulkSetActive(ids: [ID]!, isActive: Boolean!): UserBulkSetActive
+  userUpdateMetadata(id: ID!, input: MetaInput!): UserUpdateMeta
+  userClearStoredMetadata(id: ID!, input: MetaPath!): UserClearStoredMeta
+  userUpdatePrivateMetadata(id: ID!, input: MetaInput!): UserUpdatePrivateMeta
+  userClearStoredPrivateMetadata(id: ID!, input: MetaPath!): UserClearStoredPrivateMeta
 }
 
 input NameTranslationInput {
@@ -1327,6 +1868,7 @@ type Order implements Node {
   shippingMethodName: String
   token: String!
   voucher: Voucher
+  giftCards: [GiftCard]
   discountAmount: Money
   discountName: String!
   translatedDiscountName: String!
@@ -1422,8 +1964,8 @@ type OrderEvent implements Node {
   composedId: String
   orderNumber: String
   oversoldItems: [String]
-  lines: [OrderEventLineObject]
-  fulfilledItems: [OrderEventLineObject]
+  lines: [OrderEventOrderLineObject]
+  fulfilledItems: [FulfillmentLine]
 }
 
 type OrderEventCountableConnection {
@@ -1437,9 +1979,10 @@ type OrderEventCountableEdge {
   cursor: String!
 }
 
-type OrderEventLineObject {
+type OrderEventOrderLineObject {
   quantity: Int
-  item: String
+  orderLine: OrderLine
+  itemName: String
 }
 
 enum OrderEventsEmailsEnum {
@@ -1714,6 +2257,11 @@ type PaymentRefund {
   payment: Payment
 }
 
+type PaymentSource {
+  gateway: String!
+  creditCardInfo: CreditCard
+}
+
 type PaymentVoid {
   errors: [Error!]
   payment: Payment
@@ -1729,6 +2277,7 @@ enum PermissionEnum {
   MANAGE_STAFF
   IMPERSONATE_USERS
   MANAGE_DISCOUNTS
+  MANAGE_GIFT_CARD
   MANAGE_MENUS
   MANAGE_ORDERS
   MANAGE_PAGES
@@ -1757,6 +2306,8 @@ type Product implements Node {
   updatedAt: DateTime
   chargeTaxes: Boolean!
   weight: Weight
+  privateMeta: [MetaStore]!
+  meta: [MetaStore]!
   url: String!
   thumbnailUrl(size: Int): String @deprecated(reason: "thumbnailUrl is deprecated, use\\n         thumbnail instead")
   thumbnail(size: Int): Image
@@ -1765,7 +2316,8 @@ type Product implements Node {
   isAvailable: Boolean
   basePrice: Money
   price: Money @deprecated(reason: "Has been replaced by 'basePrice'")
-  taxRate: TaxRateType
+  taxRate: TaxRateType @deprecated(reason: "taxRate is deprecated. Use taxType to obtain taxCode for given tax gateway")
+  taxType: TaxType
   attributes: [SelectedAttribute!]!
   purchaseCost: MoneyRange
   margin: Margin
@@ -1785,6 +2337,16 @@ type ProductBulkDelete {
 type ProductBulkPublish {
   errors: [Error!]
   count: Int!
+}
+
+type ProductClearMeta {
+  errors: [Error!]
+  product: Product
+}
+
+type ProductClearPrivateMeta {
+  errors: [Error!]
+  product: Product
 }
 
 type ProductCountableConnection {
@@ -1814,7 +2376,9 @@ input ProductCreateInput {
   isPublished: Boolean
   name: String
   price: Decimal
+  basePrice: Decimal
   taxRate: TaxRateType
+  taxCode: String
   seo: SeoInput
   weight: WeightScalar
   sku: String
@@ -1840,7 +2404,7 @@ input ProductFilterInput {
 }
 
 type ProductImage implements Node {
-  sortOrder: Int!
+  sortOrder: Int
   id: ID!
   alt: String!
   url(size: Int): String!
@@ -1896,7 +2460,9 @@ input ProductInput {
   isPublished: Boolean
   name: String
   price: Decimal
+  basePrice: Decimal
   taxRate: TaxRateType
+  taxCode: String
   seo: SeoInput
   weight: WeightScalar
   sku: String
@@ -1947,8 +2513,11 @@ type ProductType implements Node {
   isShippingRequired: Boolean!
   isDigital: Boolean!
   weight: Weight
+  privateMeta: [MetaStore]!
+  meta: [MetaStore]!
   products(before: String, after: String, first: Int, last: Int): ProductCountableConnection
   taxRate: TaxRateType
+  taxType: TaxType
   variantAttributes: [Attribute]
   productAttributes: [Attribute]
 }
@@ -1956,6 +2525,16 @@ type ProductType implements Node {
 type ProductTypeBulkDelete {
   errors: [Error!]
   count: Int!
+}
+
+type ProductTypeClearMeta {
+  errors: [Error!]
+  productType: ProductType
+}
+
+type ProductTypeClearPrivateMeta {
+  errors: [Error!]
+  productType: ProductType
 }
 
 enum ProductTypeConfigurable {
@@ -2003,6 +2582,7 @@ input ProductTypeInput {
   isDigital: Boolean
   weight: WeightScalar
   taxRate: TaxRateType
+  taxCode: String
 }
 
 type ProductTypeUpdate {
@@ -2010,7 +2590,27 @@ type ProductTypeUpdate {
   productType: ProductType
 }
 
+type ProductTypeUpdateMeta {
+  errors: [Error!]
+  productType: ProductType
+}
+
+type ProductTypeUpdatePrivateMeta {
+  errors: [Error!]
+  productType: ProductType
+}
+
 type ProductUpdate {
+  errors: [Error!]
+  product: Product
+}
+
+type ProductUpdateMeta {
+  errors: [Error!]
+  product: Product
+}
+
+type ProductUpdatePrivateMeta {
   errors: [Error!]
   product: Product
 }
@@ -2024,6 +2624,8 @@ type ProductVariant implements Node {
   quantity: Int!
   quantityAllocated: Int!
   weight: Weight
+  privateMeta: [MetaStore]!
+  meta: [MetaStore]!
   stockQuantity: Int!
   priceOverride: Money
   price: Money @deprecated(reason: "Has been replaced by 'pricing.price_undiscounted'")
@@ -2043,6 +2645,16 @@ type ProductVariant implements Node {
 type ProductVariantBulkDelete {
   errors: [Error!]
   count: Int!
+}
+
+type ProductVariantClearMeta {
+  errors: [Error!]
+  productVariant: ProductVariant
+}
+
+type ProductVariantClearPrivateMeta {
+  errors: [Error!]
+  productVariant: ProductVariant
 }
 
 type ProductVariantCountableConnection {
@@ -2103,6 +2715,16 @@ type ProductVariantUpdate {
   productVariant: ProductVariant
 }
 
+type ProductVariantUpdateMeta {
+  errors: [Error!]
+  productVariant: ProductVariant
+}
+
+type ProductVariantUpdatePrivateMeta {
+  errors: [Error!]
+  productVariant: ProductVariant
+}
+
 type Query {
   translations(kind: TranslatableKinds!, before: String, after: String, first: Int, last: Int): TranslatableItemConnection
   shop: Shop
@@ -2137,15 +2759,18 @@ type Query {
   menus(query: String, before: String, after: String, first: Int, last: Int): MenuCountableConnection
   menuItem(id: ID!): MenuItem
   menuItems(query: String, before: String, after: String, first: Int, last: Int): MenuItemCountableConnection
+  giftCard(id: ID!): GiftCard
+  giftCards(before: String, after: String, first: Int, last: Int): GiftCardCountableConnection
   sale(id: ID!): Sale
   sales(filter: SaleFilterInput, query: String, before: String, after: String, first: Int, last: Int): SaleCountableConnection
   voucher(id: ID!): Voucher
   vouchers(filter: VoucherFilterInput, query: String, before: String, after: String, first: Int, last: Int): VoucherCountableConnection
+  taxTypes: [TaxType]
   checkout(token: UUID): Checkout
   checkouts(before: String, after: String, first: Int, last: Int): CheckoutCountableConnection
   checkoutLine(id: ID): CheckoutLine
   checkoutLines(before: String, after: String, first: Int, last: Int): CheckoutLineCountableConnection
-  addressValidator(input: AddressValidationInput!): AddressValidationData
+  addressValidationRules(countryCode: CountryCode, countryArea: String, cityArea: String): AddressValidationData
   customers(filter: CustomerFilterInput, query: String, before: String, after: String, first: Int, last: Int): UserCountableConnection
   me: User
   staffUsers(filter: StaffUserInput, query: String, before: String, after: String, first: Int, last: Int): UserCountableConnection
@@ -2173,8 +2798,8 @@ type Sale implements Node {
   name: String!
   type: SaleType!
   value: Float!
-  startDate: Date!
-  endDate: Date
+  startDate: DateTime!
+  endDate: DateTime
   categories(before: String, after: String, first: Int, last: Int): CategoryCountableConnection
   collections(before: String, after: String, first: Int, last: Int): CollectionCountableConnection
   products(before: String, after: String, first: Int, last: Int): ProductCountableConnection
@@ -2215,7 +2840,7 @@ type SaleDelete {
 input SaleFilterInput {
   status: [DiscountStatusEnum]
   saleType: DiscountValueTypeEnum
-  started: DateRangeInput
+  started: DateTimeRangeInput
   search: String
 }
 
@@ -2226,8 +2851,8 @@ input SaleInput {
   products: [ID]
   categories: [ID]
   collections: [ID]
-  startDate: Date
-  endDate: Date
+  startDate: DateTime
+  endDate: DateTime
 }
 
 type SaleRemoveCatalogues {
@@ -2409,6 +3034,12 @@ type Shop {
   automaticFulfillmentDigitalProducts: Boolean
   defaultDigitalMaxDownloads: Int
   defaultDigitalUrlValidDays: Int
+  companyAddress: Address
+}
+
+type ShopAddressUpdate {
+  errors: [Error!]
+  shop: Shop
 }
 
 type ShopDomainUpdate {
@@ -2543,6 +3174,11 @@ enum TaxRateType {
   WINE
 }
 
+type TaxType {
+  description: String
+  taxCode: String
+}
+
 type TaxedMoney {
   currency: String!
   gross: Money!
@@ -2582,7 +3218,6 @@ enum TransactionError {
 
 enum TransactionKind {
   AUTH
-  CHARGE
   REFUND
   CAPTURE
   VOID
@@ -2640,11 +3275,16 @@ type User implements Node {
   dateJoined: DateTime!
   defaultShippingAddress: Address
   defaultBillingAddress: Address
+  privateMeta: [MetaStore]!
+  meta: [MetaStore]!
   addresses: [Address]
   checkout: Checkout
+  giftCards(before: String, after: String, first: Int, last: Int): GiftCardCountableConnection
   orders(before: String, after: String, first: Int, last: Int): OrderCountableConnection
   permissions: [PermissionDisplay]
   avatar(size: Int): Image
+  events: [CustomerEvent]
+  storedPaymentSources: [PaymentSource]
 }
 
 input UserAddressInput {
@@ -2667,6 +3307,16 @@ type UserBulkSetActive {
   count: Int!
 }
 
+type UserClearStoredMeta {
+  errors: [Error!]
+  user: User
+}
+
+type UserClearStoredPrivateMeta {
+  errors: [Error!]
+  user: User
+}
+
 type UserCountableConnection {
   pageInfo: PageInfo!
   edges: [UserCountableEdge!]!
@@ -2687,6 +3337,16 @@ input UserCreateInput {
   isActive: Boolean
   note: String
   sendPasswordEmail: Boolean
+}
+
+type UserUpdateMeta {
+  errors: [Error!]
+  user: User
+}
+
+type UserUpdatePrivateMeta {
+  errors: [Error!]
+  user: User
 }
 
 type VAT {
@@ -2724,17 +3384,19 @@ type VerifyToken {
 
 type Voucher implements Node {
   id: ID!
-  type: VoucherType!
+  type: VoucherTypeEnum!
   name: String
   code: String!
   usageLimit: Int
   used: Int!
-  startDate: Date!
-  endDate: Date
+  startDate: DateTime!
+  endDate: DateTime
   applyOncePerOrder: Boolean!
-  discountValueType: VoucherDiscountValueType!
+  applyOncePerCustomer: Boolean!
+  discountValueType: DiscountValueTypeEnum!
   discountValue: Float!
   minAmountSpent: Money
+  minCheckoutItemsQuantity: Int
   categories(before: String, after: String, first: Int, last: Int): CategoryCountableConnection
   collections(before: String, after: String, first: Int, last: Int): CollectionCountableConnection
   products(before: String, after: String, first: Int, last: Int): ProductCountableConnection
@@ -2779,16 +3441,11 @@ enum VoucherDiscountType {
   SHIPPING
 }
 
-enum VoucherDiscountValueType {
-  FIXED
-  PERCENTAGE
-}
-
 input VoucherFilterInput {
   status: [DiscountStatusEnum]
   timesUsed: IntRangeInput
   discountType: [VoucherDiscountType]
-  started: DateRangeInput
+  started: DateTimeRangeInput
   search: String
 }
 
@@ -2796,15 +3453,19 @@ input VoucherInput {
   type: VoucherTypeEnum
   name: String
   code: String
-  startDate: Date
-  endDate: Date
+  startDate: DateTime
+  endDate: DateTime
   discountValueType: DiscountValueTypeEnum
   discountValue: Decimal
   products: [ID]
   collections: [ID]
   categories: [ID]
   minAmountSpent: Decimal
+  minCheckoutItemsQuantity: Int
   countries: [String]
+  applyOncePerOrder: Boolean
+  applyOncePerCustomer: Boolean
+  usageLimit: Int
 }
 
 type VoucherRemoveCatalogues {
@@ -2823,20 +3484,14 @@ type VoucherTranslation implements Node {
   language: LanguageDisplay!
 }
 
-enum VoucherType {
-  VALUE
-  PRODUCT
-  COLLECTION
-  CATEGORY
-  SHIPPING
-}
-
 enum VoucherTypeEnum {
   PRODUCT
   COLLECTION
   CATEGORY
   SHIPPING
   VALUE
+  ENTIRE_ORDER
+  SPECIFIC_PRODUCT
 }
 
 type VoucherUpdate {

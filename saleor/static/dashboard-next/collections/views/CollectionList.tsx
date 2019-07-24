@@ -2,15 +2,19 @@ import Button from "@material-ui/core/Button";
 import DialogContentText from "@material-ui/core/DialogContentText";
 import IconButton from "@material-ui/core/IconButton";
 import DeleteIcon from "@material-ui/icons/Delete";
-import * as React from "react";
+import React from "react";
 
-import ActionDialog from "../../components/ActionDialog";
-import useBulkActions from "../../hooks/useBulkActions";
-import useNavigator from "../../hooks/useNavigator";
-import useNotifier from "../../hooks/useNotifier";
-import usePaginator, { createPaginationState } from "../../hooks/usePaginator";
-import i18n from "../../i18n";
-import { getMutationState, maybe } from "../../misc";
+import ActionDialog from "@saleor/components/ActionDialog";
+import useBulkActions from "@saleor/hooks/useBulkActions";
+import useListSettings from "@saleor/hooks/useListSettings";
+import useNavigator from "@saleor/hooks/useNavigator";
+import useNotifier from "@saleor/hooks/useNotifier";
+import usePaginator, {
+  createPaginationState
+} from "@saleor/hooks/usePaginator";
+import i18n from "@saleor/i18n";
+import { getMutationState, maybe } from "@saleor/misc";
+import { ListViews } from "@saleor/types";
 import CollectionListPage from "../components/CollectionListPage/CollectionListPage";
 import {
   TypedCollectionBulkDelete,
@@ -31,16 +35,17 @@ interface CollectionListProps {
   params: CollectionListUrlQueryParams;
 }
 
-const PAGINATE_BY = 20;
-
 export const CollectionList: React.StatelessComponent<CollectionListProps> = ({
   params
 }) => {
   const navigate = useNavigator();
   const notify = useNotifier();
   const paginate = usePaginator();
-  const { isSelected, listElements, reset, toggle } = useBulkActions(
+  const { isSelected, listElements, reset, toggle, toggleAll } = useBulkActions(
     params.ids
+  );
+  const { updateListSettings, settings } = useListSettings(
+    ListViews.COLLECTION_LIST
   );
 
   const closeModal = () =>
@@ -61,7 +66,7 @@ export const CollectionList: React.StatelessComponent<CollectionListProps> = ({
       })
     );
 
-  const paginationState = createPaginationState(PAGINATE_BY, params);
+  const paginationState = createPaginationState(settings.rowNumber, params);
   return (
     <TypedCollectionListQuery displayLoader variables={paginationState}>
       {({ data, loading, refetch }) => {
@@ -128,8 +133,10 @@ export const CollectionList: React.StatelessComponent<CollectionListProps> = ({
                         collections={maybe(() =>
                           data.collections.edges.map(edge => edge.node)
                         )}
+                        settings={settings}
                         onNextPage={loadNextPage}
                         onPreviousPage={loadPreviousPage}
+                        onUpdateListSettings={updateListSettings}
                         pageInfo={pageInfo}
                         onRowClick={id => () => navigate(collectionUrl(id))}
                         toolbar={
@@ -159,6 +166,7 @@ export const CollectionList: React.StatelessComponent<CollectionListProps> = ({
                         isChecked={isSelected}
                         selected={listElements.length}
                         toggle={toggle}
+                        toggleAll={toggleAll}
                       />
                       <ActionDialog
                         open={params.action === "publish"}

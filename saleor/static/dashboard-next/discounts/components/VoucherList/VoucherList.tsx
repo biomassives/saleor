@@ -1,5 +1,4 @@
 import Card from "@material-ui/core/Card";
-import Checkbox from "@material-ui/core/Checkbox";
 import {
   createStyles,
   Theme,
@@ -11,18 +10,19 @@ import TableBody from "@material-ui/core/TableBody";
 import TableCell from "@material-ui/core/TableCell";
 import TableFooter from "@material-ui/core/TableFooter";
 import TableRow from "@material-ui/core/TableRow";
-import * as React from "react";
+import React from "react";
 
-import Date from "../../../components/Date";
-import Money from "../../../components/Money";
-import Percent from "../../../components/Percent";
-import Skeleton from "../../../components/Skeleton";
-import TableHead from "../../../components/TableHead";
-import TablePagination from "../../../components/TablePagination";
-import i18n from "../../../i18n";
-import { maybe, renderCollection } from "../../../misc";
-import { ListActions, ListProps } from "../../../types";
-import { VoucherDiscountValueType } from "../../../types/globalTypes";
+import Checkbox from "@saleor/components/Checkbox";
+import Date from "@saleor/components/Date";
+import Money from "@saleor/components/Money";
+import Percent from "@saleor/components/Percent";
+import Skeleton from "@saleor/components/Skeleton";
+import TableHead from "@saleor/components/TableHead";
+import TablePagination from "@saleor/components/TablePagination";
+import i18n from "@saleor/i18n";
+import { maybe, renderCollection } from "@saleor/misc";
+import { ListActions, ListProps } from "@saleor/types";
+import { DiscountValueTypeEnum } from "@saleor/types/globalTypes";
 import { VoucherList_vouchers_edges_node } from "../../types/VoucherList";
 
 export interface VoucherListProps extends ListProps, ListActions {
@@ -79,61 +79,69 @@ const VoucherList = withStyles(styles, {
 })(
   ({
     classes,
+    settings,
     defaultCurrency,
     disabled,
     onNextPage,
     onPreviousPage,
+    onUpdateListSettings,
     onRowClick,
     pageInfo,
     vouchers,
     isChecked,
     selected,
     toggle,
+    toggleAll,
     toolbar
   }: VoucherListProps & WithStyles<typeof styles>) => (
     <Card>
       <Table>
-        <TableHead selected={selected} toolbar={toolbar}>
-          <TableRow>
-            <TableCell />
-            <TableCell className={classes.colName}>
-              {i18n.t("Name", {
-                context: "voucher list table header"
-              })}
-            </TableCell>
-            <TableCell className={classes.colMinSpent}>
-              {i18n.t("Min. Spent", {
-                context: "voucher list table header"
-              })}
-            </TableCell>
-            <TableCell className={classes.colStart}>
-              {i18n.t("Starts", {
-                context: "voucher list table header"
-              })}
-            </TableCell>
-            <TableCell className={classes.colEnd}>
-              {i18n.t("Ends", {
-                context: "voucher list table header"
-              })}
-            </TableCell>
-            <TableCell className={classes.colValue}>
-              {i18n.t("Value", {
-                context: "voucher list table header"
-              })}
-            </TableCell>
-            <TableCell className={classes.colUses}>
-              {i18n.t("Uses", {
-                context: "voucher list table header"
-              })}
-            </TableCell>
-          </TableRow>
+        <TableHead
+          selected={selected}
+          disabled={disabled}
+          items={vouchers}
+          toggleAll={toggleAll}
+          toolbar={toolbar}
+        >
+          <TableCell className={classes.colName}>
+            {i18n.t("Code", {
+              context: "voucher list table header"
+            })}
+          </TableCell>
+          <TableCell className={classes.colMinSpent}>
+            {i18n.t("Min. Spent", {
+              context: "voucher list table header"
+            })}
+          </TableCell>
+          <TableCell className={classes.colStart}>
+            {i18n.t("Starts", {
+              context: "voucher list table header"
+            })}
+          </TableCell>
+          <TableCell className={classes.colEnd}>
+            {i18n.t("Ends", {
+              context: "voucher list table header"
+            })}
+          </TableCell>
+          <TableCell className={classes.colValue}>
+            {i18n.t("Value", {
+              context: "voucher list table header"
+            })}
+          </TableCell>
+          <TableCell className={classes.colUses}>
+            {i18n.t("Uses", {
+              context: "voucher list table header"
+            })}
+          </TableCell>
         </TableHead>
         <TableFooter>
           <TableRow>
             <TablePagination
               colSpan={7}
+              settings={settings}
               hasNextPage={pageInfo && !disabled ? pageInfo.hasNextPage : false}
               onNextPage={onNextPage}
+              onUpdateListSettings={onUpdateListSettings}
               hasPreviousPage={
                 pageInfo && !disabled ? pageInfo.hasPreviousPage : false
               }
@@ -157,17 +165,13 @@ const VoucherList = withStyles(styles, {
                 >
                   <TableCell padding="checkbox">
                     <Checkbox
-                      color="primary"
                       checked={isSelected}
                       disabled={disabled}
-                      onClick={event => {
-                        toggle(voucher.id);
-                        event.stopPropagation();
-                      }}
+                      onChange={() => toggle(voucher.id)}
                     />
                   </TableCell>
                   <TableCell className={classes.colName}>
-                    {maybe<React.ReactNode>(() => voucher.name, <Skeleton />)}
+                    {maybe<React.ReactNode>(() => voucher.code, <Skeleton />)}
                   </TableCell>
                   <TableCell className={classes.colMinSpent}>
                     {voucher && voucher.minAmountSpent ? (
@@ -202,7 +206,7 @@ const VoucherList = withStyles(styles, {
                     voucher.discountValueType &&
                     voucher.discountValue ? (
                       voucher.discountValueType ===
-                      VoucherDiscountValueType.FIXED ? (
+                      DiscountValueTypeEnum.FIXED ? (
                         <Money
                           money={{
                             amount: voucher.discountValue,

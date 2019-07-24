@@ -1,9 +1,11 @@
-import * as urlJoin from "url-join";
-
+import moment from "moment-timezone";
 import { MutationFn, MutationResult } from "react-apollo";
+import urlJoin from "url-join";
+
 import { ConfirmButtonTransitionState } from "./components/ConfirmButton/ConfirmButton";
 import { APP_MOUNT_URI } from "./config";
 import { AddressType } from "./customers/types";
+import { ChangeEvent } from "./hooks/useForm";
 import i18n from "./i18n";
 import { PartialMutationProviderOutput, UserError } from "./types";
 import {
@@ -145,7 +147,9 @@ export const translatedAuthorizationKeyTypes = () => ({
   [AuthorizationKeyType.GOOGLE_OAUTH2]: i18n.t("Google OAuth2")
 });
 
-export function maybe<T>(exp: () => T, d?: T) {
+export function maybe<T>(exp: () => T): T | undefined;
+export function maybe<T>(exp: () => T, d: T): T;
+export function maybe(exp: any, d?: any) {
   try {
     const result = exp();
     return result === undefined ? d : result;
@@ -225,4 +229,60 @@ export function getUserInitials(user?: User) {
 
 export function createHref(url: string) {
   return urlJoin(APP_MOUNT_URI, url);
+}
+
+interface AnyEvent {
+  stopPropagation: () => void;
+}
+export function stopPropagation(cb: () => void) {
+  return (event: AnyEvent) => {
+    event.stopPropagation();
+    cb();
+  };
+}
+
+export function joinDateTime(date: string, time?: string) {
+  if (!date) {
+    return null;
+  }
+  const setTime = time || "00:00";
+  const dateTime = moment(date + " " + setTime).format();
+  return dateTime;
+}
+
+export function splitDateTime(dateTime: string) {
+  if (!dateTime) {
+    return {
+      date: "",
+      time: ""
+    };
+  }
+  // Default html input format YYYY-MM-DD HH:mm
+  const splitDateTime = moment(dateTime)
+    .format("YYYY-MM-DD HH:mm")
+    .split(" ");
+  return {
+    date: splitDateTime[0],
+    time: splitDateTime[1]
+  };
+}
+
+export function generateCode(charNum: number) {
+  let result = "";
+  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  for (let i = 0; i < charNum; i++) {
+    result += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return result;
+}
+
+export function onQueryChange(
+  event: ChangeEvent,
+  onFetch: (data: string) => void,
+  setQuery: (data: string) => void
+) {
+  const value = event.target.value;
+
+  onFetch(value);
+  setQuery(value);
 }

@@ -1,3 +1,5 @@
+from copy import copy
+
 import graphene
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
@@ -7,7 +9,7 @@ from django.utils.http import urlsafe_base64_encode
 from graphql_jwt.decorators import staff_member_required
 from graphql_jwt.exceptions import PermissionDenied
 
-from ...account import emails, models, utils
+from ...account import emails, events as account_events, models, utils
 from ...account.thumbnails import create_user_avatar_thumbnails
 from ...account.utils import get_random_avatar
 from ...checkout import AddressType
@@ -21,7 +23,13 @@ from ..account.enums import AddressTypeEnum
 from ..account.i18n import I18nMixin
 from ..account.types import Address, AddressInput, User
 from ..core.enums import PermissionEnum
-from ..core.mutations import BaseMutation, ModelDeleteMutation, ModelMutation
+from ..core.mutations import (
+    BaseMutation,
+    ClearMetaBaseMutation,
+    ModelDeleteMutation,
+    ModelMutation,
+    UpdateMetaBaseMutation,
+)
 from ..core.types import Upload
 from ..core.utils import validate_image_file
 from .utils import CustomerDeleteMixin, StaffDeleteMixin, UserDeleteMixin
@@ -39,7 +47,7 @@ def send_user_password_reset_email(user, site):
         "domain": site.domain,
         "protocol": "https" if settings.ENABLE_SSL else "http",
     }
-    emails.send_password_reset_email.delay(context, user.email)
+    emails.send_password_reset_email.delay(context, user.email, user.pk)
 
 
 def can_edit_address(user, address):
@@ -77,6 +85,7 @@ class CustomerRegister(ModelMutation):
         password = cleaned_input["password"]
         user.set_password(password)
         user.save()
+        account_events.customer_account_created_event(user=user)
 
 
 class UserInput(graphene.InputObjectType):
@@ -110,6 +119,17 @@ class StaffInput(UserInput):
     permissions = graphene.List(
         PermissionEnum,
         description="List of permission code names to assign to this user.",
+    )
+
+
+class AccountInput(graphene.InputObjectType):
+    first_name = graphene.String(description="Given name.")
+    last_name = graphene.String(description="Family name.")
+    default_billing_address = AddressInput(
+        description="Billing address of the customer."
+    )
+    default_shipping_address = AddressInput(
+        description="Shipping address of the customer."
     )
 
 
@@ -163,7 +183,12 @@ class CustomerCreate(ModelMutation, I18nMixin):
             default_billing_address.save()
             instance.default_billing_address = default_billing_address
 
+        is_creation = instance.pk is None
         super().save(info, instance, cleaned_input)
+
+        # The instance is a new object in db, create an event
+        if is_creation:
+            account_events.customer_account_created_event(user=instance)
 
         if cleaned_input.get("send_password_email"):
             send_set_password_customer_email.delay(instance.pk)
@@ -180,6 +205,54 @@ class CustomerUpdate(CustomerCreate):
         description = "Updates an existing customer."
         exclude = ["password"]
         model = models.User
+        permissions = ("account.manage_users",)
+
+    @classmethod
+    def generate_events(
+        cls, info, old_instance: models.User, new_instance: models.User
+    ):
+        # Retrieve the event base data
+        staff_user = info.context.user
+        new_email = new_instance.email
+        new_fullname = new_instance.get_full_name()
+
+        # Compare the data
+        has_new_name = old_instance.get_full_name() != new_fullname
+        has_new_email = old_instance.email != new_email
+
+        # Generate the events accordingly
+        if has_new_email:
+            account_events.staff_user_assigned_email_to_a_customer_event(
+                staff_user=staff_user, new_email=new_email
+            )
+        if has_new_name:
+            account_events.staff_user_assigned_name_to_a_customer_event(
+                staff_user=staff_user, new_name=new_fullname
+            )
+
+    @classmethod
+    def perform_mutation(cls, _root, info, **data):
+        """Override the base method `perform_mutation` of ModelMutation
+        to generate events by comparing the old instance with the new data."""
+
+        # Retrieve the data
+        original_instance = cls.get_instance(info, **data)
+        data = data.get("input")
+
+        # Clean the input and generate a new instance from the new data
+        cleaned_input = cls.clean_input(info, original_instance, data)
+        new_instance = cls.construct_instance(copy(original_instance), cleaned_input)
+
+        # Save the new instance data
+        cls.clean_instance(new_instance)
+        cls.save(info, new_instance, cleaned_input)
+        cls._save_m2m(info, new_instance, cleaned_input)
+
+        # Generate events by comparing the instances
+        cls.generate_events(info, original_instance, new_instance)
+
+        # Return the response
+        return cls.success_response(new_instance)
 
 
 class LoggedUserUpdate(CustomerCreate):
@@ -189,7 +262,10 @@ class LoggedUserUpdate(CustomerCreate):
         )
 
     class Meta:
-        description = "Updates data of the logged in user."
+        description = (
+            "DEPRECATED: Use AccountUpdate instead. "
+            "Updates data of the logged in user."
+        )
         exclude = ["password"]
         model = models.User
 
@@ -202,6 +278,46 @@ class LoggedUserUpdate(CustomerCreate):
         user = info.context.user
         data["id"] = graphene.Node.to_global_id("User", user.id)
         return super().perform_mutation(root, info, **data)
+
+
+class AccountUpdate(CustomerCreate):
+    class Arguments:
+        input = AccountInput(
+            description="Fields required to update the account of the logged-in user.",
+            required=True,
+        )
+
+    class Meta:
+        description = "Updates the account of the logged-in user."
+        exclude = ["password"]
+        model = models.User
+
+    @classmethod
+    def check_permissions(cls, user):
+        return user.is_authenticated
+
+    @classmethod
+    def perform_mutation(cls, root, info, **data):
+        user = info.context.user
+        data["id"] = graphene.Node.to_global_id("User", user.id)
+        return super().perform_mutation(root, info, **data)
+
+
+class AccountRequestDeletion(BaseMutation):
+    class Meta:
+        description = (
+            "Sends an email with the account removal link for the logged-in user."
+        )
+
+    @classmethod
+    def check_permissions(cls, user):
+        return user.is_authenticated
+
+    @classmethod
+    def perform_mutation(cls, root, info, **data):
+        user = info.context.user
+        emails.send_account_delete_confirmation_email.delay(str(user.token), user.email)
+        return AccountRequestDeletion()
 
 
 class UserDelete(UserDeleteMixin, ModelDeleteMutation):
@@ -217,6 +333,12 @@ class CustomerDelete(CustomerDeleteMixin, UserDelete):
 
     class Arguments:
         id = graphene.ID(required=True, description="ID of a customer to delete.")
+
+    @classmethod
+    def perform_mutation(cls, root, info, **data):
+        results = super().perform_mutation(root, info, **data)
+        cls.post_process(info)
+        return results
 
 
 class StaffCreate(ModelMutation):
@@ -347,6 +469,7 @@ class SetPassword(ModelMutation):
     def save(cls, info, instance, cleaned_input):
         instance.set_password(cleaned_input["password"])
         instance.save()
+        account_events.customer_password_reset_event(user=instance)
 
 
 class PasswordReset(BaseMutation):
@@ -666,3 +789,33 @@ class UserAvatarDelete(BaseMutation):
         user.avatar.delete_sized_images()
         user.avatar.delete()
         return UserAvatarDelete(user=user)
+
+
+class UserUpdateMeta(UpdateMetaBaseMutation):
+    class Meta:
+        description = "Updates metadata for user."
+        model = models.User
+        public = True
+
+
+class UserUpdatePrivateMeta(UpdateMetaBaseMutation):
+    class Meta:
+        description = "Updates private metadata for user."
+        permissions = ("account.manage_users",)
+        model = models.User
+        public = False
+
+
+class UserClearStoredMeta(ClearMetaBaseMutation):
+    class Meta:
+        description = "Clear stored metadata value."
+        model = models.User
+        public = True
+
+
+class UserClearStoredPrivateMeta(ClearMetaBaseMutation):
+    class Meta:
+        description = "Clear stored metadata value."
+        model = models.User
+        permissions = ("account.manage_users",)
+        public = False

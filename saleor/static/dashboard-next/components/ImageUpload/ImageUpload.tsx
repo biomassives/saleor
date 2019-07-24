@@ -7,7 +7,7 @@ import {
 import { fade } from "@material-ui/core/styles/colorManipulator";
 import Typography from "@material-ui/core/Typography";
 import classNames from "classnames";
-import * as React from "react";
+import React from "react";
 
 import i18n from "../../i18n";
 import ImageIcon from "../../icons/Image";
@@ -54,7 +54,7 @@ const styles = (theme: Theme) =>
       textAlign: "center"
     },
     uploadText: {
-      color: theme.typography.body1.color,
+      color: theme.typography.body2.color,
       textTransform: "uppercase"
     }
   });
@@ -94,7 +94,7 @@ export const ImageUpload = withStyles(styles, { name: "ImageUpload" })(
             >
               <input {...getInputProps()} className={classes.fileField} />
               <ImageIcon className={classes.photosIcon} />
-              <Typography className={classes.uploadText} variant="body2">
+              <Typography className={classes.uploadText} variant="body1">
                 {i18n.t("Drop here to upload", {
                   context: "image upload"
                 })}

@@ -25,7 +25,7 @@ def product_json_ld(product, attributes=None):
         "@type": "Product",
         "name": smart_text(product),
         "image": [product_image.image.url for product_image in product.images.all()],
-        "description": product.description,
+        "description": product.plain_text_description,
         "offers": [],
     }
 
@@ -48,7 +48,7 @@ def variant_json_ld(price, variant, in_stock):
         "@type": "Offer",
         "itemCondition": "http://schema.org/NewCondition",
         "priceCurrency": price.currency,
-        "price": price.net.amount,
+        "price": price.amount,
         "sku": variant.sku,
     }
     if in_stock:
